@@ -3,19 +3,14 @@ import './App.css';
 import 'react-toastify/dist/ReactToastify.css';
 import Header from './components/Header';
 import AuthModal from './components/AuthModal';
+import WelcomePage from './components/WelcomePage';
 import { ToastContainer, toast } from 'react-toastify';
 import { fetchWithAuth as fetchWithAuthHelper } from './utils/fetchWithAuth';
-
-interface User {
-    id: number;
-    username: string;
-    email: string;
-}
 
 const App = () => {
     const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
     const [authToken, setAuthToken] = useState<string | null>(null);
-    const [currentUser, setCurrentUser] = useState<User | null>(null);
+    const [currentUser, setCurrentUser] = useState<any>(null);
     const [authLoading, setAuthLoading] = useState<boolean>(true);
     const [isRegisterOpen, setIsRegisterOpen] = useState(false);
     const [isLoginOpen, setIsLoginOpen] = useState(false);
@@ -32,7 +27,6 @@ const App = () => {
         try {
             return await fetchWithAuthHelper(url, options, handleLogout);
         } catch (error) {
-
             throw error;
         }
     }, [handleLogout]);
@@ -93,11 +87,11 @@ const App = () => {
     };
 
     if (authLoading) {
-        return <div style={{ textAlign: 'center', margin: '4rem 0' }}>Проверка авторизации...</div>;
+        return <div className="loading-screen">Проверка авторизации...</div>;
     }
 
     return (
-      <div className="container">
+      <>
           <Header
               isAuthenticated={isAuthenticated}
               user={currentUser}
@@ -108,15 +102,14 @@ const App = () => {
 
           <main>
               {isAuthenticated ? (
-                  <div className="card">
-                      <h2>Дашборд эффективности</h2>
-                      <p>Здесь будут метрики и графики.</p>
+                  <div className="content-wrapper">
+                      <div className="card">
+                          <h2>Дашборд эффективности</h2>
+                          <p>Здесь будут метрики и графики.</p>
+                      </div>
                   </div>
               ) : (
-                  <div className="card" style={{ textAlign: 'center' }}>
-                      <h2>Система анализа эффективности команд разработки</h2>
-                      <p>Пожалуйста, войдите или зарегистрируйтесь для доступа к дашбордам.</p>
-                  </div>
+                  <WelcomePage />
               )}
           </main>
 
@@ -124,7 +117,7 @@ const App = () => {
           <AuthModal isOpen={isLoginOpen} onClose={() => setIsLoginOpen(false)} onSubmit={handleLogin} title="Вход" submitButtonText="Войти" />
 
           <ToastContainer position="bottom-right" autoClose={5000} hideProgressBar={false} theme="colored" />
-        </div>
+      </>
     );
 };
 
