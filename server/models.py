@@ -57,9 +57,12 @@ class Commit(db.Model):
     author_name = db.Column(db.String(255), nullable=False)
     author_email = db.Column(db.String(255), nullable=True)
     commit_date = db.Column(db.DateTime(timezone=True), nullable=False)
+    commit_content=db.Column(db.String, nullable=True)
     added_lines = db.Column(db.Integer, default=0)
     deleted_lines = db.Column(db.Integer, default=0)
-    
+    difficult_metrics = db.Column(db.Float, default=0.0)
+    quality_metrics = db.Column(db.Float, default=0.0)
+    size_metrics = db.Column(db.Integer, default=0)
     repository_id = db.Column(db.Integer, db.ForeignKey('repositories.id'), nullable=False)
     project_key = db.Column(db.String, db.ForeignKey('projects.key'), nullable=True)
 
