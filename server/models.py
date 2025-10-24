@@ -6,6 +6,7 @@ db = SQLAlchemy()
 bcrypt = Bcrypt()
 
 class User(db.Model):
+    __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
@@ -22,18 +23,54 @@ class User(db.Model):
         return f'<User {self.username}>'
 
 class Project(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), unique=True, nullable=False)
+    __tablename__ = 'projects'
+    key = db.Column(db.String(100), primary_key=True)
+    name = db.Column(db.String(255), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+
+    repositories = db.relationship(
+        'Repository', 
+        foreign_keys='Repository.project_key',
+        backref='project', 
+        lazy=True, 
+        cascade="all, delete-orphan"
+    )
+
+    def __repr__(self):
+        return f'<Project {self.key}>'
 
 class Repository(db.Model):
+    __tablename__ = 'repositories'
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), nullable=False)
-    project_id = db.Column(db.Integer, db.ForeignKey('project.id'), nullable=False)
+    name = db.Column(db.String(255), nullable=False)
+    project_key = db.Column(db.String(255), db.ForeignKey('projects.key'), nullable=False)
+    
+    commits = db.relationship('Commit', backref='repository', lazy=True, cascade="all, delete-orphan")
+    
+    def to_dict(self):
+        return {'id': self.id, 'name': self.name, 'project_key': self.project_key}
 
 class Commit(db.Model):
-    id = db.Column(db.String(40), primary_key=True)
-    repository_id = db.Column(db.Integer, db.ForeignKey('repository.id'), nullable=False)
-    author_email = db.Column(db.String(120), nullable=False)
+    __tablename__ = 'commits'
+    sha = db.Column(db.String(40), primary_key=True)
+    message = db.Column(db.Text, nullable=False)
+    author_name = db.Column(db.String(255), nullable=False)
+    author_email = db.Column(db.String(255), nullable=True)
+    commit_date = db.Column(db.DateTime(timezone=True), nullable=False)
     added_lines = db.Column(db.Integer, default=0)
     deleted_lines = db.Column(db.Integer, default=0)
-    commit_date = db.Column(db.DateTime, nullable=False)
+    
+    repository_id = db.Column(db.Integer, db.ForeignKey('repositories.id'), nullable=False)
+    project_key = db.Column(db.String, db.ForeignKey('projects.key'), nullable=True)
+
+    def to_dict(self):
+        return {
+            'sha': self.sha,
+            'message': self.message,
+            'author_name': self.author_name,
+            'author_email': self.author_email,
+            'commit_date': self.commit_date.isoformat(),
+            'added_lines': self.added_lines,
+            'deleted_lines': self.deleted_lines,
+            'repository_id': self.repository_id
+        }

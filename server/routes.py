@@ -1,19 +1,80 @@
-from flask import jsonify
-from utils import get_user_reports
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask import jsonify, request
+from flask_jwt_extended import jwt_required
 import logging
+from models import Project, Repository, Commit
+from sfera_api import SferaAPI
+from requests.exceptions import HTTPError
 
 logger = logging.getLogger(__name__)
 
 def register_routes(app):
-
-    @app.route('/api/reports', methods=['GET'])
+    @app.route('/api/data/projects', methods=['GET'])
     @jwt_required()
-    def get_reports_stub():
-        current_user_id = get_jwt_identity()
+    def get_projects():
         try:
-            user_reports_list = get_user_reports(current_user_id)
-            return jsonify(user_reports_list)
+            projects = Project.query.order_by(Project.key).all()
+            return jsonify([
+                {"key": p.key, "name": p.name} for p in projects
+            ]), 200
         except Exception as e:
-            logger.error(f"Ошибка в get_reports_stub для пользователя {current_user_id}: {str(e)}", exc_info=True)
-            return jsonify({"error": "Внутренняя ошибка сервера"}), 500
+            logger.error(f"Ошибка получения проектов из БД: {e}", exc_info=True)
+            return jsonify({"error": "Ошибка сервера при получении проектов"}), 500
+
+    @app.route('/api/data/repositories', methods=['GET'])
+    @jwt_required()
+    def get_repositories():
+        project_key = request.args.get('project_key')
+        if not project_key:
+            return jsonify([]), 200
+        try:
+            query = Repository.query.filter_by(project_key=project_key).order_by(Repository.name)
+            repositories = query.all()
+            return jsonify([
+                {"id": r.id, "name": r.name} for r in repositories
+            ]), 200
+        except Exception as e:
+            logger.error(f"Ошибка получения репозиториев из БД: {e}", exc_info=True)
+            return jsonify({"error": "Ошибка сервера при получении репозиториев"}), 500
+
+    @app.route('/api/data/branches', methods=['GET'])
+    @jwt_required()
+    def get_branches():
+        project_key = request.args.get('project_key')
+        repo_name = request.args.get('repo_name')
+
+        if not project_key or not repo_name:
+            return jsonify([]), 200
+        
+        try:
+            api = SferaAPI()
+            branches = api.get_repo_branches(project_key, repo_name)
+            return jsonify([{"name": b.get("name")} for b in branches if b.get("name")]), 200
+        except HTTPError as e:
+            if e.response.status_code == 404:
+                logger.warning(f"Репозиторий {project_key}/{repo_name} не найден в Sfera API. Возвращаем пустой список веток.")
+                return jsonify([]), 200
+            logger.error(f"HTTP ошибка получения веток из API: {e}", exc_info=True)
+            return jsonify({"error": "Ошибка сервера при получении веток"}), 500
+        except Exception as e:
+            logger.error(f"Критическая ошибка получения веток из API: {e}", exc_info=True)
+            return jsonify({"error": "Ошибка сервера при получении веток"}), 500
+            
+    @app.route('/api/data/commits', methods=['GET'])
+    @jwt_required()
+    def get_commits():
+        try:
+            commits = Commit.query.order_by(Commit.commit_date.desc()).limit(100).all()
+            return jsonify([
+                {
+                    "sha": c.sha,
+                    "message": c.message.splitlines()[0],
+                    "author_name": c.author_name,
+                    "commit_date": c.commit_date.isoformat(),
+                    "added_lines": c.added_lines,
+                    "deleted_lines": c.deleted_lines,
+                    "repository_id": c.repository_id
+                } for c in commits
+            ]), 200
+        except Exception as e:
+            logger.error(f"Ошибка получения коммитов из БД: {e}", exc_info=True)
+            return jsonify({"error": "Ошибка сервера при получении коммитов"}), 500
