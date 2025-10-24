@@ -27,31 +27,74 @@ interface DashboardStats {
 
 const Dashboard: React.FC<DashboardProps> = ({ fetchWithAuth }) => {
   const [commits, setCommits] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [isCollecting, setIsCollecting] = useState(false);
   const [collectionStatusMsg, setCollectionStatusMsg] = useState('Ожидание запуска');
 
   const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [isStatsLoading, setIsStatsLoading] = useState(true);
+  const [isStatsLoading, setIsStatsLoading] = useState(false);
 
+  const [lastFilters, setLastFilters] = useState<any>(null);
   const prevIsCollecting = useRef<boolean>(false);
 
-  const fetchDashboardData = useCallback(async () => {
+  // Аналитика по найденным коммитам (фронт)
+  const calculateStats = (commits: any[]): DashboardStats => {
+    const total_commits = commits.length;
+    const total_lines_changed = commits.reduce((acc, c) => acc + (c.added_lines || 0) + (c.deleted_lines || 0), 0);
+    const contributors = Array.from(new Set(commits.map(c => c.author_name)));
+    const active_contributors = contributors.length;
+    const last_commit_date = commits.length > 0 ? commits[0].commit_date : null;
+    // Топ 5 контрибьюторов
+    const contribMap: Record<string, number> = {};
+    commits.forEach(c => {
+      if (!contribMap[c.author_name]) contribMap[c.author_name] = 0;
+      contribMap[c.author_name]++;
+    });
+    const top_contributors = Object.entries(contribMap)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([author, commits]) => ({ author, commits }));
+    // Активность по дням
+    const activityMap: Record<string, number> = {};
+    commits.forEach(c => {
+      const date = c.commit_date.slice(0, 10);
+      activityMap[date] = (activityMap[date] || 0) + 1;
+    });
+    const labels = Object.keys(activityMap).sort();
+    const data = labels.map(l => activityMap[l]);
+    return {
+      summary: {
+        total_commits,
+        total_lines_changed,
+        active_contributors,
+        last_commit_date,
+      },
+      top_contributors,
+      commit_activity: { labels, data },
+    };
+  };
+
+  // Запрос коммитов по фильтрам
+  const fetchFilteredCommits = useCallback(async (filters: any) => {
+    setIsLoading(true);
     setIsStatsLoading(true);
     try {
-      const [statsRes, commitRes] = await Promise.all([
-        fetchWithAuth('/api/metrics/dashboard_stats'),
-        fetchWithAuth('/api/data/commits'),
-      ]);
-      
-      if (!statsRes.ok) throw new Error('Ошибка загрузки статистики');
-      if (!commitRes.ok) throw new Error('Ошибка загрузки коммитов');
-
-      setStats(await statsRes.json());
-      setCommits(await commitRes.json());
-
+      const params = new URLSearchParams();
+      if (filters.project_key) params.append('project_key', filters.project_key);
+      if (filters.repo_name) params.append('repo_name', filters.repo_name);
+      if (filters.branch_name) params.append('branch_name', filters.branch_name);
+      if (filters.target_email) params.append('author_email', filters.target_email);
+      if (filters.since) params.append('since', filters.since);
+      if (filters.until) params.append('until', filters.until);
+      const res = await fetchWithAuth(`/api/data/commits?${params.toString()}`);
+      if (!res.ok) throw new Error('Ошибка загрузки коммитов по фильтрам');
+      const data = await res.json();
+      setCommits(data);
+      setStats(calculateStats(data));
     } catch (error: any) {
-      toast.error(error.message || 'Не удалось загрузить данные дашборда');
+      toast.error(error.message || 'Не удалось загрузить коммиты по фильтрам');
+      setCommits([]);
+      setStats(null);
     } finally {
       setIsLoading(false);
       setIsStatsLoading(false);
@@ -70,23 +113,25 @@ const Dashboard: React.FC<DashboardProps> = ({ fetchWithAuth }) => {
   }, [fetchWithAuth]);
 
   useEffect(() => {
-    if (prevIsCollecting.current && !isCollecting) {
-      toast.info("Сбор данных завершен, обновляем дашборд...");
-      fetchDashboardData();
+    if (prevIsCollecting.current && !isCollecting && lastFilters) {
+      toast.info("Сбор данных завершен, обновляем найденные коммиты...");
+      fetchFilteredCommits(lastFilters);
     }
     prevIsCollecting.current = isCollecting;
-  }, [isCollecting, fetchDashboardData]);
+  }, [isCollecting, fetchFilteredCommits, lastFilters]);
 
   useEffect(() => {
-    fetchDashboardData();
     const interval = setInterval(checkCollectionStatus, 5000);
     return () => clearInterval(interval);
-  }, [fetchDashboardData, checkCollectionStatus]);
+  }, [checkCollectionStatus]);
 
   const handleStartAnalysis = async (params: any) => {
     setIsCollecting(true);
     setCollectionStatusMsg("Запрос на анализ отправлен...");
     toast.info("Запрос на анализ данных отправлен...");
+    setLastFilters(params);
+    setCommits([]);
+    setStats(null);
     try {
       const response = await fetchWithAuth('/api/admin/start-collection', {
         method: 'POST',
@@ -129,25 +174,18 @@ const Dashboard: React.FC<DashboardProps> = ({ fetchWithAuth }) => {
             <strong>Статус:</strong> {collectionStatusMsg}
         </div>
       </div>
-      
-      {/* --- БЛОК С МЕТРИКАМИ --- */}
-      <div className="metrics-section">
-        <h3>Общая аналитика по базе данных</h3>
-        <MetricsDashboard stats={stats} isLoading={isStatsLoading} />
-      </div>
-      
-      <hr className="divider" />
 
-      {/* --- БЛОК С ФИЛЬТРАМИ ДЛЯ СБОРА ДАННЫХ --- */}
+      {/* --- ФИЛЬТРЫ ДЛЯ СБОРА ДАННЫХ --- */}
       <AnalysisFilters 
         fetchWithAuth={fetchWithAuth} 
         onAnalysisStart={handleStartAnalysis} 
         isCollecting={isCollecting} 
       />
-      
+
+      {/* --- ТАБЛИЦА НАЙДЕННЫХ КОММИТОВ --- */}
       <div className="dashboard-grid" style={{ marginTop: '2rem' }}>
         <Table
-          title="Последние 100 коммитов в БД"
+          title="Найденные коммиты по фильтрам"
           headers={['SHA', 'Автор', 'Сообщение', 'Дата']}
           data={commits}
           renderRow={(c: any) => (
@@ -159,6 +197,12 @@ const Dashboard: React.FC<DashboardProps> = ({ fetchWithAuth }) => {
             </tr>
           )}
         />
+      </div>
+
+      {/* --- АНАЛИТИКА ПО НАЙДЕННЫМ КОММИТАМ --- */}
+      <div className="metrics-section">
+        <h3>Аналитика по найденным коммитам</h3>
+        <MetricsDashboard stats={stats} isLoading={isStatsLoading} />
       </div>
     </div>
   );

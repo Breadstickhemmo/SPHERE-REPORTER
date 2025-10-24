@@ -54,7 +54,6 @@ def collect_data_for_target(sfera_username, sfera_password, project_key, repo_na
 
             logger.info(f"Будет просканировано {len(branches_to_scan)} веток: {branches_to_scan}")
 
-            # Парсинг дат с подробным логированием
             logger.info(f"Получены даты для парсинга: since='{since}', until='{until}'")
             since_dt = parser.isoparse(since)
             until_dt = parser.isoparse(until)
@@ -105,12 +104,10 @@ def collect_data_for_target(sfera_username, sfera_password, project_key, repo_na
                     
                     commit_dt = parser.isoparse(commit_date_str)
                     logger.info(f"Проверка даты коммита {sha[:7]}: {commit_dt} в диапазоне {since_dt} -> {until_dt}")
-                    
-                    # Проверяем дату
+
                     if since_dt <= commit_dt <= until_dt:
                         logger.info(f"  -> Коммит {sha[:7]} прошел проверку даты")
                         is_valid = True
-                        # Если указан target_email, проверяем его
                         if target_email:
                             author = commit_data.get('author', {})
                             author_email = author.get('email', '').lower()
@@ -200,7 +197,6 @@ def collect_data_for_target(sfera_username, sfera_password, project_key, repo_na
                 
                 total_newly_saved_commits += newly_saved_in_branch
 
-            # Формируем сообщение о результатах
             if target_email:
                 if total_commits_found_in_range > 0:
                     msg = (f"Анализ завершен. Найдено {total_commits_found_in_range} коммитов от автора {target_email}. "

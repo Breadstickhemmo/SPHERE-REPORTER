@@ -19,13 +19,33 @@
   margin: 0;
 }
 
+.filters-grid .form-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 500;
+  color: #333;
+  font-size: 0.9rem;
+}
+
 .filters-grid select, .filters-grid input {
   width: 100%;
-  padding: 10px;
-  border: 1px solid #ccc;
+  padding: 12px;
+  border: 1px solid #e0e0e0;
   border-radius: 8px;
   font-size: 0.95rem;
   box-sizing: border-box;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  background-color: #fff;
+}
+
+.filters-grid select:focus, .filters-grid input:focus {
+  border-color: #4c6ef5;
+  box-shadow: 0 0 0 2px rgba(76, 110, 245, 0.1);
+  outline: none;
+}
+
+.filters-grid select:hover, .filters-grid input:hover {
+  border-color: #4c6ef5;
 }
 
 .filters-grid .submit-group {

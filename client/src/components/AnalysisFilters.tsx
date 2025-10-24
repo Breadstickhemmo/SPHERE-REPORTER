@@ -21,9 +21,9 @@ const AnalysisFilters: React.FC<AnalysisFiltersProps> = ({ fetchWithAuth, onAnal
   const [selectedRepo, setSelectedRepo] = useState('');
   const [selectedBranch, setSelectedBranch] = useState('');
   
-  const [sferaUsername, setSferaUsername] = useState('');
-  const [sferaPassword, setSferaPassword] = useState('');
-  const [targetEmail, setTargetEmail] = useState('');
+  const [sferaUsername, setSferaUsername] = useState(() => localStorage.getItem('sfera_username') || '');
+  const [sferaPassword, setSferaPassword] = useState(() => localStorage.getItem('sfera_password') || '');
+  const [targetEmail, setTargetEmail] = useState(() => localStorage.getItem('target_email') || '');
   
   const today = new Date();
   const sevenDaysAgo = new Date();
@@ -136,11 +136,29 @@ const AnalysisFilters: React.FC<AnalysisFiltersProps> = ({ fetchWithAuth, onAnal
       <div className="filters-grid credentials-grid">
         <div className="form-group">
           <label>Email в Сфере</label>
-          <input type="text" value={sferaUsername} onChange={e => setSferaUsername(e.target.value)} required />
+          <input 
+            type="text" 
+            value={sferaUsername} 
+            onChange={e => {
+              setSferaUsername(e.target.value);
+              localStorage.setItem('sfera_username', e.target.value);
+            }} 
+            className="form-control"
+            required 
+          />
         </div>
         <div className="form-group">
           <label>Пароль/Токен в Сфере</label>
-          <input type="password" value={sferaPassword} onChange={e => setSferaPassword(e.target.value)} required />
+          <input 
+            type="password" 
+            value={sferaPassword} 
+            onChange={e => {
+              setSferaPassword(e.target.value);
+              localStorage.setItem('sfera_password', e.target.value);
+            }}
+            className="form-control" 
+            required 
+          />
         </div>
         <div className="form-group submit-group credentials-btn-group">
            <button type="button" className="secondary-btn" onClick={handleLoadProjects} disabled={isLoadingProjects}>

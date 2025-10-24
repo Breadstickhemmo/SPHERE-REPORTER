@@ -63,7 +63,30 @@ def register_routes(app):
     @jwt_required()
     def get_commits():
         try:
-            commits = Commit.query.order_by(Commit.commit_date.desc()).limit(100).all()
+            project_key = request.args.get('project_key')
+            repo_name = request.args.get('repo_name')
+            branch_name = request.args.get('branch_name')
+            author_email = request.args.get('author_email')
+            since = request.args.get('since')
+            until = request.args.get('until')
+
+            query = Commit.query
+            if project_key:
+                query = query.filter(Commit.project_key == project_key)
+            if repo_name:
+                repo = Repository.query.filter_by(name=repo_name, project_key=project_key).first()
+                if repo:
+                    query = query.filter(Commit.repository_id == repo.id)
+            if branch_name and branch_name != 'all':
+                pass
+            if author_email:
+                query = query.filter(Commit.author_email.ilike(author_email))
+            if since:
+                query = query.filter(Commit.commit_date >= since)
+            if until:
+                query = query.filter(Commit.commit_date <= until)
+
+            commits = query.order_by(Commit.commit_date.desc()).limit(100).all()
             return jsonify([
                 {
                     "sha": c.sha,
@@ -76,5 +99,5 @@ def register_routes(app):
                 } for c in commits
             ]), 200
         except Exception as e:
-            logger.error(f"Ошибка получения коммитов из БД: {e}", exc_info=True)
+            logger.error(f"Ошибка получения коммитов по фильтрам: {e}", exc_info=True)
             return jsonify({"error": "Ошибка сервера при получении коммитов"}), 500

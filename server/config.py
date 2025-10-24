@@ -22,3 +22,4 @@ class Config:
 
     JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY')
     SECRET_KEY = os.getenv('FLASK_SECRET_KEY')
+    JWT_ACCESS_TOKEN_EXPIRES = 24 * 60 * 60
