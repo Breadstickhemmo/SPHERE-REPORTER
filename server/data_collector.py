@@ -6,6 +6,7 @@ from datetime import datetime
 from sfera_api import SferaAPI
 from models import db, Project, Repository, Commit
 from dateutil import parser
+import base64
 
 logger = logging.getLogger(__name__)
 
