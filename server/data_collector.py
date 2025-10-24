@@ -5,6 +5,7 @@ from datetime import datetime
 from sfera_api import SferaAPI
 from models import db, Project, Repository, Commit
 from dateutil import parser
+import base64
 
 logger = logging.getLogger(__name__)
 
@@ -167,8 +168,19 @@ def collect_data_for_target(sfera_username, sfera_password, project_key, repo_na
                             added_lines=stats.get('additions', 0),
                             deleted_lines=stats.get('deletions', 0),
                             repository_id=repository.id,
-                            project_key=project_key
+                            project_key=project_key,
+                            difficult_metrics = abs(added_lines-deleted_lines)*1/66*10, # сложность
+                            quality_metrics = (100-(difficult_metrics*0.2))/20, # качество
+                            # размер
+                            size_metrics = 0,
+                            commit_content=base64.b64decode(commit_data.get('data', {}).get('content', '')).decode('utf-8'),
                         )
+                        if abs(new_commit.added_lines-new_commit.deleted_lines) > 80: new_commit.size_metrics=5
+                        elif abs(new_commit.added_lines-new_commit.deleted_lines) > 50: new_commit.size_metrics=4
+                        elif abs(new_commit.added_lines-new_commit.deleted_lines) > 20: new_commit.size_metrics = 3
+                        elif abs(new_commit.added_lines-new_commit.deleted_lines) > 10: new_commit.size_metrics = 2
+                        else: new_commit.size_metrics = 1
+                        if new_commit.difficult_metrics > 5: new_commit.difficult_metrics = 5
                         logger.info(f"Создан объект коммита {sha[:7]} для сохранения в БД")
                     except Exception as e:
                         logger.error(f"Ошибка создания объекта коммита {sha[:7]}: {str(e)}")
