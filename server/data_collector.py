@@ -1,6 +1,7 @@
 import logging
 import hashlib
 import time
+import base64
 from datetime import datetime
 from sfera_api import SferaAPI
 from models import db, Project, Repository, Commit
@@ -156,7 +157,9 @@ def collect_data_for_target(sfera_username, sfera_password, project_key, repo_na
                         continue
                     
                     stats = commit_details_response['data'].get('stats', {})
-                    
+                    data = api._get(f"projects/{project_key}/repos/{repo_name}/commits/{sha}/diff", params=None)
+                    data = data.get('data', {})
+                    data = data.get('content', '')
                     try:
                         new_commit = Commit(
                             sha=sha,
@@ -164,16 +167,18 @@ def collect_data_for_target(sfera_username, sfera_password, project_key, repo_na
                             author_name=commit_data.get('author', {}).get('name', 'N/A'),
                             author_email=commit_data.get('author', {}).get('email', 'N/A'),
                             commit_date=parser.isoparse(commit_data.get('created_at')),
+                            commit_content=base64.b64decode(data).decode('utf-8'),
                             added_lines=stats.get('additions', 0),
                             deleted_lines=stats.get('deletions', 0),
                             repository_id=repository.id,
                             project_key=project_key,
-                            difficult_metrics = abs(added_lines-deleted_lines)*1/66*10, # сложность
-                            quality_metrics = (100-(difficult_metrics*0.2))/20, # качество
+                            difficult_metrics = abs(stats.get('additions', 0)-stats.get('deletions', 0))*1/66*10, # сложность
+                            quality_metrics = (100-abs(stats.get('additions', 0)-stats.get('deletions', 0))*1/66*10)/20, # качество
                             # размер
                             size_metrics = 0
                             
                         )
+                        logger.info(f"{str(new_commit.commit_content)} - Содержимое коммита {sha[:7]}")
                         if abs(new_commit.added_lines-new_commit.deleted_lines) > 80: new_commit.size_metrics=5
                         elif abs(new_commit.added_lines-new_commit.deleted_lines) > 50: new_commit.size_metrics=4
                         elif abs(new_commit.added_lines-new_commit.deleted_lines) > 20: new_commit.size_metrics = 3
