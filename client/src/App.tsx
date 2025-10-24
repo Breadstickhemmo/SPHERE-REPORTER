@@ -4,13 +4,20 @@ import 'react-toastify/dist/ReactToastify.css';
 import Header from './components/Header';
 import AuthModal from './components/AuthModal';
 import WelcomePage from './components/WelcomePage';
+import Dashboard from './components/Dashboard';
 import { ToastContainer, toast } from 'react-toastify';
 import { fetchWithAuth as fetchWithAuthHelper } from './utils/fetchWithAuth';
+
+interface User {
+    id: number;
+    username: string;
+    email: string;
+}
 
 const App = () => {
     const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
     const [authToken, setAuthToken] = useState<string | null>(null);
-    const [currentUser, setCurrentUser] = useState<any>(null);
+    const [currentUser, setCurrentUser] = useState<User | null>(null);
     const [authLoading, setAuthLoading] = useState<boolean>(true);
     const [isRegisterOpen, setIsRegisterOpen] = useState(false);
     const [isLoginOpen, setIsLoginOpen] = useState(false);
@@ -27,6 +34,7 @@ const App = () => {
         try {
             return await fetchWithAuthHelper(url, options, handleLogout);
         } catch (error) {
+
             throw error;
         }
     }, [handleLogout]);
@@ -44,15 +52,26 @@ const App = () => {
         if (authToken) {
             setAuthLoading(true);
             fetchWithAuth('/api/me')
-                .then(response => response.ok ? response.json() : null)
+                .then(response => {
+                    if (response.ok) {
+                        return response.json();
+                    }
+                    return null;
+                })
                 .then(data => {
-                    if (data) {
+                    if (data && data.user) {
                         setCurrentUser(data.user);
                         setIsAuthenticated(true);
                     }
                 })
-                .catch(err => console.error("Ошибка проверки сессии:", err))
-                .finally(() => setAuthLoading(false));
+                .catch(err => {
+                    if (!(err instanceof Error && err.message.includes('401'))) {
+                        console.error("Ошибка проверки сессии:", err);
+                    }
+                })
+                .finally(() => {
+                    setAuthLoading(false);
+                });
         } else {
             setIsAuthenticated(false);
             setAuthLoading(false);
@@ -66,9 +85,11 @@ const App = () => {
             body: JSON.stringify(formData)
         });
         const data = await response.json();
-        if (!response.ok) throw new Error(data.error || 'Ошибка регистрации');
+        if (!response.ok) {
+            throw new Error(data.error || 'Ошибка регистрации');
+        }
         setIsRegisterOpen(false);
-        toast.success(data.message || 'Регистрация успешна!');
+        toast.success(data.message || 'Регистрация прошла успешно!');
         setIsLoginOpen(true);
     };
 
@@ -79,7 +100,9 @@ const App = () => {
             body: JSON.stringify(formData)
         });
         const data = await response.json();
-        if (!response.ok) throw new Error(data.error || 'Ошибка входа');
+        if (!response.ok) {
+            throw new Error(data.error || 'Ошибка входа');
+        }
         localStorage.setItem('authToken', data.access_token);
         setAuthToken(data.access_token);
         setIsLoginOpen(false);
@@ -103,20 +126,35 @@ const App = () => {
           <main>
               {isAuthenticated ? (
                   <div className="content-wrapper">
-                      <div className="card">
-                          <h2>Дашборд эффективности</h2>
-                          <p>Здесь будут метрики и графики.</p>
-                      </div>
+                      <Dashboard fetchWithAuth={fetchWithAuth} />
                   </div>
               ) : (
                   <WelcomePage />
               )}
           </main>
 
-          <AuthModal isOpen={isRegisterOpen} onClose={() => setIsRegisterOpen(false)} onSubmit={handleRegister} title="Регистрация" submitButtonText="Зарегистрироваться" />
-          <AuthModal isOpen={isLoginOpen} onClose={() => setIsLoginOpen(false)} onSubmit={handleLogin} title="Вход" submitButtonText="Войти" />
+          <AuthModal 
+            isOpen={isRegisterOpen} 
+            onClose={() => setIsRegisterOpen(false)} 
+            onSubmit={handleRegister} 
+            title="Регистрация" 
+            submitButtonText="Зарегистрироваться" 
+          />
+          
+          <AuthModal 
+            isOpen={isLoginOpen} 
+            onClose={() => setIsLoginOpen(false)} 
+            onSubmit={handleLogin} 
+            title="Вход" 
+            submitButtonText="Войти" 
+          />
 
-          <ToastContainer position="bottom-right" autoClose={5000} hideProgressBar={false} theme="colored" />
+          <ToastContainer 
+            position="bottom-right" 
+            autoClose={5000} 
+            hideProgressBar={false} 
+            theme="colored" 
+          />
       </>
     );
 };

@@ -11,6 +11,7 @@ from routes import register_routes
 from auth_routes import register_auth_routes
 from admin_routes import register_admin_routes
 from sfera_routes import register_sfera_routes
+from metrics_routes import register_metrics_routes
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -36,6 +37,7 @@ register_routes(app)
 register_auth_routes(app)
 register_admin_routes(app)
 register_sfera_routes(app)
+register_metrics_routes(app)
 
 
 if __name__ == '__main__':

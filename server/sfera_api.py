@@ -28,7 +28,7 @@ class SferaAPI:
             
             data = response.json()
             logger.info(f"Получен ответ от {endpoint}. Статус: {response.status_code}")
-            logger.info(f"Структура ответа: {str(data)[:500]}...")  # Логируем первые 500 символов ответа
+            logger.info(f"Структура ответа: {str(data)[:500]}...")
             
             if not isinstance(data, dict):
                 logger.error(f"Неожиданный формат ответа от {endpoint}: {type(data)}")
@@ -51,7 +51,6 @@ class SferaAPI:
         return response_json.get('data', []) if response_json else []
 
     def get_project_repos(self, project_key: str) -> List[Dict]:
-        """Получает список репозиториев для указанного проекта."""
         logger.info(f"Запрос списка репозиториев для проекта '{project_key}'...")
         response_json = self._get(f"projects/{project_key}/repos")
         return response_json.get('data', []) if response_json else []
@@ -85,7 +84,6 @@ class SferaAPI:
                 logger.info("  -> Получена пустая страница с коммитами, завершаем.")
                 break
                 
-            # Отладочный вывод для первого коммита в ответе
             if items and len(all_items) == 0:
                 logger.info("Пример структуры данных коммита:")
                 logger.info(str(items[0]))
@@ -116,11 +114,9 @@ class SferaAPI:
         return all_items
 
     def get_commit_details(self, project_key: str, repo_name: str, sha: str) -> Optional[Dict]:
-        """Получает детали коммита. В API Сфера.Код коммит идентифицируется по hash."""
         logger.info(f"Запрос деталей коммита {sha[:7]}...")
         response = self._get(f"projects/{project_key}/repos/{repo_name}/commits/{sha}")
         if response:
-            # Создаем структуру с необходимыми статистическими данными
             if 'data' not in response:
                 response['data'] = {}
             if 'stats' not in response['data']:
