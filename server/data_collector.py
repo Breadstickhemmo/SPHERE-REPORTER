@@ -12,7 +12,15 @@ def collect_data_for_target(sfera_username, sfera_password, project_key, repo_na
     from app import app
     with app.app_context():
         db.session.remove()
-        logger.info(f"Target email для фильтрации: {target_email}")
+        
+        logger.info("=== Начало сбора данных ===")
+        logger.info(f"Параметры:")
+        logger.info(f"  - project_key: {project_key}")
+        logger.info(f"  - repo_name: {repo_name}")
+        logger.info(f"  - branch_name: {branch_name}")
+        logger.info(f"  - target_email: {target_email}")
+        logger.info(f"  - since: {since}")
+        logger.info(f"  - until: {until}")
         commit_count = db.session.query(Commit).count()
         project_count = db.session.query(Project).count()
         repo_count = db.session.query(Repository).count()
@@ -46,8 +54,15 @@ def collect_data_for_target(sfera_username, sfera_password, project_key, repo_na
 
             logger.info(f"Будет просканировано {len(branches_to_scan)} веток: {branches_to_scan}")
 
+            # Парсинг дат с подробным логированием
+            logger.info(f"Получены даты для парсинга: since='{since}', until='{until}'")
             since_dt = parser.isoparse(since)
             until_dt = parser.isoparse(until)
+            
+            logger.info(f"Даты успешно распарсены:")
+            logger.info(f"  - since_dt: {since_dt} (timestamp: {since_dt.timestamp()})")
+            logger.info(f"  - until_dt: {until_dt} (timestamp: {until_dt.timestamp()})")
+            
             logger.info(f"Диапазон дат для фильтрации: {since_dt} -> {until_dt}")
 
             total_commits_found_in_range = 0
@@ -89,20 +104,38 @@ def collect_data_for_target(sfera_username, sfera_password, project_key, repo_na
                     logger.info(f"Обработка коммита {sha[:7]} от {commit_data.get('author', {}).get('name')}")
                     
                     commit_dt = parser.isoparse(commit_date_str)
+                    logger.info(f"Проверка даты коммита {sha[:7]}: {commit_dt} в диапазоне {since_dt} -> {until_dt}")
                     
-                    # Проверяем дату и email автора
+                    # Проверяем дату
                     if since_dt <= commit_dt <= until_dt:
+                        logger.info(f"  -> Коммит {sha[:7]} прошел проверку даты")
+                        is_valid = True
                         # Если указан target_email, проверяем его
                         if target_email:
                             author = commit_data.get('author', {})
                             author_email = author.get('email', '').lower()
-                            if author_email != target_email.lower():
-                                continue
-                        commits_in_range.append(commit_data)
+                            target_email_lower = target_email.lower()
+                            
+                            logger.info(f"  -> Сравниваем email: '{author_email}' с целевым '{target_email_lower}'")
+                            
+                            if author_email != target_email_lower:
+                                is_valid = False
+                                logger.info(f"  -> Пропускаем коммит {sha[:7]} (автор: {author.get('name')}, email: {author_email}) - не соответствует целевому email: {target_email}")
+                            else:
+                                logger.info(f"  -> [НАЙДЕН] Коммит {sha[:7]} (автор: {author.get('name')}, email: {author_email}) соответствует целевому email")
+                        else:
+                            logger.info(f"  -> Email фильтрация отключена, пропускаем проверку email")
+                        
+                        if is_valid:
+                            commits_in_range.append(commit_data)
+                            logger.info(f"  -> Коммит {sha[:7]} добавлен в список для обработки")
+                    else:
+                        logger.info(f"  -> Коммит {sha[:7]} не попадает в диапазон дат")
                 
                 num_found_in_branch = len(commits_in_range)
                 total_commits_found_in_range += num_found_in_branch
-                logger.info(f"  -> Найдено {num_found_in_branch} коммитов в диапазоне. Синхронизируем с БД...")
+                target_text = f" для автора {target_email}" if target_email else ""
+                logger.info(f"  -> Найдено {num_found_in_branch} коммитов{target_text} в диапазоне. Синхронизируем с БД...")
 
                 newly_saved_in_branch = 0
                 for i, commit_data in enumerate(commits_in_range):
@@ -167,11 +200,19 @@ def collect_data_for_target(sfera_username, sfera_password, project_key, repo_na
                 
                 total_newly_saved_commits += newly_saved_in_branch
 
-            if total_commits_found_in_range > 0:
-                msg = (f"Анализ завершен. Найдено {total_commits_found_in_range} коммитов в диапазоне. "
-                       f"Из них {total_newly_saved_commits} было добавлено в базу данных.")
+            # Формируем сообщение о результатах
+            if target_email:
+                if total_commits_found_in_range > 0:
+                    msg = (f"Анализ завершен. Найдено {total_commits_found_in_range} коммитов от автора {target_email}. "
+                          f"Из них {total_newly_saved_commits} было добавлено в базу данных.")
+                else:
+                    msg = f"Анализ завершен. Коммитов от автора {target_email} в указанном диапазоне не найдено."
             else:
-                msg = "Анализ завершен. Коммитов в указанном диапазоне не найдено."
+                if total_commits_found_in_range > 0:
+                    msg = (f"Анализ завершен. Найдено {total_commits_found_in_range} коммитов в диапазоне. "
+                          f"Из них {total_newly_saved_commits} было добавлено в базу данных.")
+                else:
+                    msg = "Анализ завершен. Коммитов в указанном диапазоне не найдено."
             
             logger.info(msg)
             return msg
