@@ -65,7 +65,7 @@ const MetricsDashboard: React.FC<MetricsDashboardProps> = ({ stats, isLoading })
     return (
         <div className="card" style={{ textAlign: 'center', padding: '2rem' }}>
             <h3>Данные для анализа отсутствуют</h3>
-            <p>Чтобы начать, используйте форму ниже для сбора данных из вашего репозитория.</p>
+            <p>Чтобы начать, используйте форму выше для сбора данных из вашего репозитория.</p>
         </div>
     );
   }
@@ -76,11 +76,11 @@ const MetricsDashboard: React.FC<MetricsDashboardProps> = ({ stats, isLoading })
     <div className="metrics-dashboard">
       <div className="stats-grid">
         <StatCard title="Всего коммитов" value={summary.total_commits.toLocaleString('ru-RU')} />
-        <StatCard title="Всего строк изменено" value={summary.total_lines_changed.toLocaleString('ru-RU')} />
         <StatCard title="Активных контрибьюторов" value={summary.active_contributors} />
         <StatCard 
             title="Последний коммит" 
             value={summary.last_commit_date ? new Date(summary.last_commit_date).toLocaleDateString('ru-RU') : 'N/A'} 
+            className="last-commit-card"
         />
       </div>
       

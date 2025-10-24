@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'react-toastify';
 import AnalysisFilters from './AnalysisFilters';
 import MetricsDashboard from './MetricsDashboard';
+import CommitDetailModal from './CommitDetailModal';
 import '../styles/Dashboard.css';
 
 interface DashboardProps {
@@ -30,21 +31,18 @@ const Dashboard: React.FC<DashboardProps> = ({ fetchWithAuth }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [isCollecting, setIsCollecting] = useState(false);
   const [collectionStatusMsg, setCollectionStatusMsg] = useState('Ожидание запуска');
-
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [isStatsLoading, setIsStatsLoading] = useState(false);
-
   const [lastFilters, setLastFilters] = useState<any>(null);
   const prevIsCollecting = useRef<boolean>(false);
+  const [selectedCommit, setSelectedCommit] = useState<any | null>(null);
 
-  // Аналитика по найденным коммитам (фронт)
   const calculateStats = (commits: any[]): DashboardStats => {
     const total_commits = commits.length;
     const total_lines_changed = commits.reduce((acc, c) => acc + (c.added_lines || 0) + (c.deleted_lines || 0), 0);
     const contributors = Array.from(new Set(commits.map(c => c.author_name)));
     const active_contributors = contributors.length;
     const last_commit_date = commits.length > 0 ? commits[0].commit_date : null;
-    // Топ 5 контрибьюторов
     const contribMap: Record<string, number> = {};
     commits.forEach(c => {
       if (!contribMap[c.author_name]) contribMap[c.author_name] = 0;
@@ -54,7 +52,6 @@ const Dashboard: React.FC<DashboardProps> = ({ fetchWithAuth }) => {
       .sort((a, b) => b[1] - a[1])
       .slice(0, 5)
       .map(([author, commits]) => ({ author, commits }));
-    // Активность по дням
     const activityMap: Record<string, number> = {};
     commits.forEach(c => {
       const date = c.commit_date.slice(0, 10);
@@ -63,18 +60,12 @@ const Dashboard: React.FC<DashboardProps> = ({ fetchWithAuth }) => {
     const labels = Object.keys(activityMap).sort();
     const data = labels.map(l => activityMap[l]);
     return {
-      summary: {
-        total_commits,
-        total_lines_changed,
-        active_contributors,
-        last_commit_date,
-      },
+      summary: { total_commits, total_lines_changed, active_contributors, last_commit_date },
       top_contributors,
       commit_activity: { labels, data },
     };
   };
 
-  // Запрос коммитов по фильтрам
   const fetchFilteredCommits = useCallback(async (filters: any) => {
     setIsLoading(true);
     setIsStatsLoading(true);
@@ -82,7 +73,6 @@ const Dashboard: React.FC<DashboardProps> = ({ fetchWithAuth }) => {
       const params = new URLSearchParams();
       if (filters.project_key) params.append('project_key', filters.project_key);
       if (filters.repo_name) params.append('repo_name', filters.repo_name);
-      if (filters.branch_name) params.append('branch_name', filters.branch_name);
       if (filters.target_email) params.append('author_email', filters.target_email);
       if (filters.since) params.append('since', filters.since);
       if (filters.until) params.append('until', filters.until);
@@ -138,9 +128,7 @@ const Dashboard: React.FC<DashboardProps> = ({ fetchWithAuth }) => {
         body: JSON.stringify(params),
       });
       const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.message || 'Не удалось запустить анализ');
-      }
+      if (!response.ok) throw new Error(data.message || 'Не удалось запустить анализ');
       toast.success("Анализ запущен в фоновом режиме.");
     } catch (error: any) {
       toast.error(error.message);
@@ -188,14 +176,25 @@ const Dashboard: React.FC<DashboardProps> = ({ fetchWithAuth }) => {
         <div className="content-wrapper">
             <Table
               title="Найденные коммиты по фильтрам"
-              headers={['SHA', 'Автор', 'Сообщение', 'Дата']}
+              headers={['Автор', 'Сообщение', 'Дата', 'Общая оценка', 'Действия']}
               data={commits}
               renderRow={(c: any) => (
                 <tr key={c.sha}>
-                  <td title={c.sha}>{c.sha.substring(0, 7)}</td>
                   <td>{c.author_name}</td>
                   <td title={c.message}>{c.message}</td>
                   <td>{new Date(c.commit_date).toLocaleString('ru-RU')}</td>
+                  <td>
+                    {c.total_score_100 !== null && c.total_score_100 !== undefined ? `${c.total_score_100} / 100` : 'Нет оценки'}
+                  </td>
+                  <td>
+                    <button 
+                      className="secondary-btn" 
+                      onClick={() => setSelectedCommit(c)}
+                      disabled={c.total_score_100 === null || c.total_score_100 === undefined}
+                    >
+                      Детально
+                    </button>
+                  </td>
                 </tr>
               )}
             />
@@ -208,6 +207,13 @@ const Dashboard: React.FC<DashboardProps> = ({ fetchWithAuth }) => {
             )}
         </div>
       </div>
+      {selectedCommit && (
+        <CommitDetailModal 
+          commitSha={selectedCommit.sha}
+          fetchWithAuth={fetchWithAuth}
+          onClose={() => setSelectedCommit(null)}
+        />
+      )}
     </div>
   );
 };

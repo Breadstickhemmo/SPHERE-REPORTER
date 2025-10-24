@@ -6,6 +6,9 @@ load_dotenv()
 class Config:
     SFERA_USERNAME = os.getenv('SFERA_USERNAME')
     SFERA_PASSWORD = os.getenv('SFERA_PASSWORD')
+    
+    # --- НОВАЯ ПЕРЕМЕННАЯ ---
+    GIGACHAT_CREDENTIALS = os.getenv('GIGACHAT_CREDENTIALS')
 
     REPORT_DIR = os.path.abspath("reports")
     LLM_REPORT_DIR = os.path.abspath("llm_reports")

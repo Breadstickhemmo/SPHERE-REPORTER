@@ -60,14 +60,18 @@ class Commit(db.Model):
     commit_content=db.Column(db.String, nullable=True)
     added_lines = db.Column(db.Integer, default=0)
     deleted_lines = db.Column(db.Integer, default=0)
-    difficult_metrics = db.Column(db.Float, default=0.0)
-    quality_metrics = db.Column(db.Float, default=0.0)
-    size_metrics = db.Column(db.Integer, default=0)
     repository_id = db.Column(db.Integer, db.ForeignKey('repositories.id'), nullable=False)
     project_key = db.Column(db.String, db.ForeignKey('projects.key'), nullable=True)
 
+    llm_score_size = db.Column(db.Integer, nullable=True)
+    llm_score_quality = db.Column(db.Integer, nullable=True)
+    llm_score_complexity = db.Column(db.Integer, nullable=True)
+    llm_score_comment = db.Column(db.Integer, nullable=True)
+    llm_total_score = db.Column(db.Integer, nullable=True)
+    llm_evaluation_text = db.Column(db.Text, nullable=True)
+
     def to_dict(self):
-        return {
+        commit_dict = {
             'sha': self.sha,
             'message': self.message,
             'author_name': self.author_name,
@@ -75,5 +79,20 @@ class Commit(db.Model):
             'commit_date': self.commit_date.isoformat(),
             'added_lines': self.added_lines,
             'deleted_lines': self.deleted_lines,
-            'repository_id': self.repository_id
+            'repository_id': self.repository_id,
+            'total_score_100': int((self.llm_total_score / 20) * 100) if self.llm_total_score is not None else None
         }
+        return commit_dict
+
+    def to_detailed_dict(self):
+        base_dict = self.to_dict()
+        base_dict.update({
+            'llm_scores': {
+                'size': self.llm_score_size,
+                'quality': self.llm_score_quality,
+                'complexity': self.llm_score_complexity,
+                'comment': self.llm_score_comment
+            },
+            'llm_recommendations': self.llm_evaluation_text
+        })
+        return base_dict

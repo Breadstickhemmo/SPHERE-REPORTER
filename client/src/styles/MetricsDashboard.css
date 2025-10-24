@@ -31,6 +31,10 @@
   color: #2F2BF0;
 }
 
+.stat-card.last-commit-card p {
+  font-size: 1.75rem;
+}
+
 .bar-chart {
   padding: 1.5rem 2rem;
 }

@@ -1,12 +1,10 @@
 import logging
 import hashlib
-import time
 import base64
-from datetime import datetime
 from sfera_api import SferaAPI
 from models import db, Project, Repository, Commit
 from dateutil import parser
-import base64
+from llm_analyzer import analyze_commit_code
 
 logger = logging.getLogger(__name__)
 
@@ -16,25 +14,11 @@ def collect_data_for_target(sfera_username, sfera_password, project_key, repo_na
         db.session.remove()
         
         logger.info("=== Начало сбора данных ===")
-        logger.info(f"Параметры:")
-        logger.info(f"  - project_key: {project_key}")
-        logger.info(f"  - repo_name: {repo_name}")
-        logger.info(f"  - branch_name: {branch_name}")
-        logger.info(f"  - target_email: {target_email}")
-        logger.info(f"  - since: {since}")
-        logger.info(f"  - until: {until}")
-        commit_count = db.session.query(Commit).count()
-        project_count = db.session.query(Project).count()
-        repo_count = db.session.query(Repository).count()
-        logger.info(f"Текущее состояние БД: проектов - {project_count}, репозиториев - {repo_count}, коммитов - {commit_count}")
         try:
-            logger.info(f"НАЧАЛО ЦЕЛЕВОГО СБОРА ДАННЫХ для {project_key}/{repo_name}")
-            
             api = SferaAPI(username=sfera_username, password=sfera_password)
             
             project = db.session.query(Project).filter_by(key=project_key).first()
             if not project:
-                logger.info(f"Проект '{project_key}' не найден в БД, создаем новый.")
                 project = Project(key=project_key, name=project_key, description=f"Project {project_key}")
                 db.session.add(project)
                 db.session.commit()
@@ -44,7 +28,6 @@ def collect_data_for_target(sfera_username, sfera_password, project_key, repo_na
 
             repository = db.session.query(Repository).filter_by(id=repo_id).first()
             if not repository:
-                logger.info(f"Репозиторий '{repo_name}' не найден в БД, создаем новый.")
                 repository = Repository(id=repo_id, name=repo_name, project_key=project_key)
                 db.session.add(repository)
                 db.session.commit()
@@ -54,178 +37,89 @@ def collect_data_for_target(sfera_username, sfera_password, project_key, repo_na
                 branches_from_api = api.get_repo_branches(project_key, repo_name)
                 branches_to_scan = [b.get('name') for b in branches_from_api if b.get('name')]
 
-            logger.info(f"Будет просканировано {len(branches_to_scan)} веток: {branches_to_scan}")
-
-            logger.info(f"Получены даты для парсинга: since='{since}', until='{until}'")
             since_dt = parser.isoparse(since)
             until_dt = parser.isoparse(until)
             
-            logger.info(f"Даты успешно распарсены:")
-            logger.info(f"  - since_dt: {since_dt} (timestamp: {since_dt.timestamp()})")
-            logger.info(f"  - until_dt: {until_dt} (timestamp: {until_dt.timestamp()})")
-            
-            logger.info(f"Диапазон дат для фильтрации: {since_dt} -> {until_dt}")
-
             total_commits_found_in_range = 0
             total_newly_saved_commits = 0
 
             for b_name in branches_to_scan:
-                db.session.remove()
                 db.session.begin()
-                
-                logger.info(f"-> Начинаем сбор для ветки: '{b_name}'")
-                
-                current_commits = db.session.query(Commit).count()
-                logger.info(f"  -> Текущее количество коммитов в БД: {current_commits}")
                 
                 commits_from_api = api.get_repo_commits(project_key, repo_name, branch=b_name, since_dt=since_dt)
                 
                 if not commits_from_api:
-                    logger.warning(f"Коммиты для ветки '{b_name}' не получены от API.")
                     continue
 
                 commits_in_range = []
                 for commit_data in commits_from_api:
-                    if isinstance(commit_data, dict):
-                        logger.info(f"Получены данные коммита: {commit_data}")
-                    else:
-                        logger.warning(f"Неожиданный формат данных коммита: {type(commit_data)}")
-                        continue
-                        
                     commit_date_str = commit_data.get('created_at')
-                    if not commit_date_str:
-                        logger.warning(f"Коммит без даты создания: {commit_data}")
-                        continue
-                    
+                    if not commit_date_str: continue
                     sha = commit_data.get('hash')
-                    if not sha:
-                        logger.warning(f"Коммит без hash: {commit_data}")
-                        continue
-                    
-                    logger.info(f"Обработка коммита {sha[:7]} от {commit_data.get('author', {}).get('name')}")
+                    if not sha: continue
                     
                     commit_dt = parser.isoparse(commit_date_str)
-                    logger.info(f"Проверка даты коммита {sha[:7]}: {commit_dt} в диапазоне {since_dt} -> {until_dt}")
-
                     if since_dt <= commit_dt <= until_dt:
-                        logger.info(f"  -> Коммит {sha[:7]} прошел проверку даты")
                         is_valid = True
-                        if target_email:
-                            author = commit_data.get('author', {})
-                            author_email = author.get('email', '').lower()
-                            target_email_lower = target_email.lower()
-                            
-                            logger.info(f"  -> Сравниваем email: '{author_email}' с целевым '{target_email_lower}'")
-                            
-                            if author_email != target_email_lower:
-                                is_valid = False
-                                logger.info(f"  -> Пропускаем коммит {sha[:7]} (автор: {author.get('name')}, email: {author_email}) - не соответствует целевому email: {target_email}")
-                            else:
-                                logger.info(f"  -> [НАЙДЕН] Коммит {sha[:7]} (автор: {author.get('name')}, email: {author_email}) соответствует целевому email")
-                        else:
-                            logger.info(f"  -> Email фильтрация отключена, пропускаем проверку email")
+                        if target_email and commit_data.get('author', {}).get('email', '').lower() != target_email.lower():
+                            is_valid = False
                         
                         if is_valid:
                             commits_in_range.append(commit_data)
-                            logger.info(f"  -> Коммит {sha[:7]} добавлен в список для обработки")
-                    else:
-                        logger.info(f"  -> Коммит {sha[:7]} не попадает в диапазон дат")
                 
-                num_found_in_branch = len(commits_in_range)
-                total_commits_found_in_range += num_found_in_branch
-                target_text = f" для автора {target_email}" if target_email else ""
-                logger.info(f"  -> Найдено {num_found_in_branch} коммитов{target_text} в диапазоне. Синхронизируем с БД...")
+                total_commits_found_in_range += len(commits_in_range)
 
-                newly_saved_in_branch = 0
                 for i, commit_data in enumerate(commits_in_range):
                     sha = commit_data.get('hash')
-                    if not sha: 
-                        logger.warning("Получен коммит без hash, пропускаем")
-                        continue
+                    if not sha: continue
 
-                    existing_commit = db.session.query(Commit).filter_by(sha=sha).first()
-                    logger.info(f"  -> Проверка коммита {sha[:7]}: {commit_data.get('message', '')[:50]}...")
-                    
-                    if existing_commit:
-                        logger.info(f"  -> Коммит {sha[:7]} уже существует в БД (автор: {existing_commit.author_name})")
+                    if db.session.query(Commit).filter_by(sha=sha).first():
                         continue
                         
-                    logger.info(f"  -> Найден новый коммит {sha[:7]}, получаем детали...")
-
                     commit_details_response = api.get_commit_details(project_key, repo_name, sha)
-                    if not commit_details_response or 'data' not in commit_details_response or 'stats' not in commit_details_response['data']:
-                        logger.warning(f"Не удалось получить детали для коммита {sha[:7]}. Пропускаем.")
+                    if not commit_details_response or 'data' not in commit_details_response:
                         continue
                     
                     stats = commit_details_response['data'].get('stats', {})
-                    data = api._get(f"projects/{project_key}/repos/{repo_name}/commits/{sha}/diff", params=None)
-                    data = data.get('data', {})
-                    data = data.get('content', '')
-                    try:
-                        new_commit = Commit(
-                            sha=sha,
-                            message=commit_data.get('message', ''),
-                            author_name=commit_data.get('author', {}).get('name', 'N/A'),
-                            author_email=commit_data.get('author', {}).get('email', 'N/A'),
-                            commit_date=parser.isoparse(commit_data.get('created_at')),
-                            commit_content=base64.b64decode(data).decode('utf-8'),
-                            added_lines=stats.get('additions', 0),
-                            deleted_lines=stats.get('deletions', 0),
-                            repository_id=repository.id,
-                            project_key=project_key,
-                            difficult_metrics = abs(stats.get('additions', 0)-stats.get('deletions', 0))*1/66*10, # сложность
-                            quality_metrics = (100-abs(stats.get('additions', 0)-stats.get('deletions', 0))*1/66*10)/20, # качество
-                            # размер
-                            size_metrics = 0
-                            
-                        )
-                        logger.info(f"{str(new_commit.commit_content)} - Содержимое коммита {sha[:7]}")
-                        if abs(new_commit.added_lines-new_commit.deleted_lines) > 80: new_commit.size_metrics=5
-                        elif abs(new_commit.added_lines-new_commit.deleted_lines) > 50: new_commit.size_metrics=4
-                        elif abs(new_commit.added_lines-new_commit.deleted_lines) > 20: new_commit.size_metrics = 3
-                        elif abs(new_commit.added_lines-new_commit.deleted_lines) > 10: new_commit.size_metrics = 2
-                        else: new_commit.size_metrics = 1
-                        if new_commit.difficult_metrics > 5: new_commit.difficult_metrics = 5
-                        logger.info(f"Создан объект коммита {sha[:7]} для сохранения в БД")
-                    except Exception as e:
-                        logger.error(f"Ошибка создания объекта коммита {sha[:7]}: {str(e)}")
-                        continue
-                    try:
-                        if not db.session.query(Commit).filter_by(sha=sha).first():
-                            db.session.add(new_commit)
-                            try:
-                                db.session.commit()
-                                newly_saved_in_branch += 1
-                                logger.info(f"  -> Успешно сохранен новый коммит: {sha[:7]}")
-                            except Exception as e:
-                                logger.error(f"  -> Ошибка при commit транзакции для {sha[:7]}: {str(e)}")
-                                db.session.rollback()
-                        else:
-                            logger.warning(f"  -> Коммит {sha[:7]} появился в БД во время обработки, пропускаем")
-                    except Exception as e:
-                        logger.error(f"  -> Ошибка при сохранении коммита {sha[:7]}: {str(e)}")
-                        db.session.rollback()
-                
-                actual_commits = db.session.query(Commit).count()
-                logger.info(f"  -> Статистика ветки '{b_name}':")
-                logger.info(f"     * Найдено коммитов в диапазоне: {num_found_in_branch}")
-                logger.info(f"     * Сохранено новых коммитов: {newly_saved_in_branch}")
-                logger.info(f"     * Всего коммитов в БД: {actual_commits}")
-                
-                total_newly_saved_commits += newly_saved_in_branch
+                    diff_response = api._get(f"projects/{project_key}/repos/{repo_name}/commits/{sha}/diff", params=None)
+                    diff_content_base64 = diff_response.get('data', {}).get('content', '')
 
-            if target_email:
-                if total_commits_found_in_range > 0:
-                    msg = (f"Анализ завершен. Найдено {total_commits_found_in_range} коммитов от автора {target_email}. "
-                          f"Из них {total_newly_saved_commits} было добавлено в базу данных.")
-                else:
-                    msg = f"Анализ завершен. Коммитов от автора {target_email} в указанном диапазоне не найдено."
-            else:
-                if total_commits_found_in_range > 0:
-                    msg = (f"Анализ завершен. Найдено {total_commits_found_in_range} коммитов в диапазоне. "
-                          f"Из них {total_newly_saved_commits} было добавлено в базу данных.")
-                else:
-                    msg = "Анализ завершен. Коммитов в указанном диапазоне не найдено."
+                    new_commit = Commit(
+                        sha=sha,
+                        message=commit_data.get('message', ''),
+                        author_name=commit_data.get('author', {}).get('name', 'N/A'),
+                        author_email=commit_data.get('author', {}).get('email', 'N/A'),
+                        commit_date=parser.isoparse(commit_data.get('created_at')),
+                        added_lines=stats.get('additions', 0),
+                        deleted_lines=stats.get('deletions', 0),
+                        repository_id=repository.id,
+                        project_key=project_key,
+                    )
+
+                    try:
+                        diff_content = base64.b64decode(diff_content_base64).decode('utf-8', errors='ignore')
+                        new_commit.commit_content = diff_content
+                        
+                        analysis_result = analyze_commit_code(diff_content)
+                        
+                        if analysis_result and "scores" in analysis_result:
+                            scores = analysis_result["scores"]
+                            new_commit.llm_score_size = scores.get('size')
+                            new_commit.llm_score_quality = scores.get('quality')
+                            new_commit.llm_score_complexity = scores.get('complexity')
+                            new_commit.llm_score_comment = scores.get('comment')
+                            new_commit.llm_total_score = scores.get('sum')
+                            new_commit.llm_evaluation_text = analysis_result.get("raw_text")
+                            logger.info(f"Коммит {sha[:7]} успешно проанализирован GigaChat.")
+                    except Exception as e:
+                        logger.error(f"Ошибка во время LLM-анализа коммита {sha[:7]}: {e}")
+
+                    db.session.add(new_commit)
+                    total_newly_saved_commits += 1
+                db.session.commit()
+
+            msg = (f"Анализ завершен. Найдено {total_commits_found_in_range} коммитов. "
+                   f"Добавлено в базу: {total_newly_saved_commits}.")
             
             logger.info(msg)
             return msg
