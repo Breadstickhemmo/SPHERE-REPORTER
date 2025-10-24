@@ -8,9 +8,12 @@ from models import db, Commit
 
 def register_metrics_routes(app):
 
+    app.logger.info("Регистрируем маршруты метрик")
+
     @app.route('/api/metrics/dashboard_stats', methods=['GET'])
     @jwt_required()
     def get_dashboard_stats():
+        app.logger.info("Вход в /api/metrics/dashboard_stats")
         total_commits = db.session.query(func.count(Commit.sha)).scalar()
         
         if total_commits == 0:

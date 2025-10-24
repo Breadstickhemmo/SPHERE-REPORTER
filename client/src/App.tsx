@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import './App.css';
+import './styles/global.css';
 import 'react-toastify/dist/ReactToastify.css';
 import Header from './components/Header';
 import AuthModal from './components/AuthModal';

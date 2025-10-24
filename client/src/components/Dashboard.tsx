@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'react-toastify';
 import AnalysisFilters from './AnalysisFilters';
-import MetricsDashboard from './MetricsDashboard'; // <-- ИМПОРТ
+import MetricsDashboard from './MetricsDashboard';
+import '../styles/Dashboard.css';
 
 interface DashboardProps {
   fetchWithAuth: (url: string, options?: RequestInit) => Promise<Response>;
 }
 
-// Добавляем интерфейс для статистики
 interface DashboardStats {
   summary: {
     total_commits: number;
@@ -30,8 +30,7 @@ const Dashboard: React.FC<DashboardProps> = ({ fetchWithAuth }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [isCollecting, setIsCollecting] = useState(false);
   const [collectionStatusMsg, setCollectionStatusMsg] = useState('Ожидание запуска');
-  
-  // Состояния для метрик
+
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [isStatsLoading, setIsStatsLoading] = useState(true);
 
@@ -71,7 +70,6 @@ const Dashboard: React.FC<DashboardProps> = ({ fetchWithAuth }) => {
   }, [fetchWithAuth]);
 
   useEffect(() => {
-    // Если сборка только что завершилась
     if (prevIsCollecting.current && !isCollecting) {
       toast.info("Сбор данных завершен, обновляем дашборд...");
       fetchDashboardData();
@@ -101,7 +99,7 @@ const Dashboard: React.FC<DashboardProps> = ({ fetchWithAuth }) => {
       toast.success("Анализ запущен в фоновом режиме.");
     } catch (error: any) {
       toast.error(error.message);
-      setIsCollecting(false); // Возвращаем в исходное состояние при ошибке
+      setIsCollecting(false);
     }
   };
 

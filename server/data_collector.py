@@ -8,11 +8,11 @@ from dateutil import parser
 
 logger = logging.getLogger(__name__)
 
-def collect_data_for_target(sfera_username, sfera_password, project_key, repo_name, branch_name, since, until, **kwargs):
+def collect_data_for_target(sfera_username, sfera_password, project_key, repo_name, branch_name, since, until, target_email=None, **kwargs):
     from app import app
     with app.app_context():
         db.session.remove()
-        
+        logger.info(f"Target email для фильтрации: {target_email}")
         commit_count = db.session.query(Commit).count()
         project_count = db.session.query(Project).count()
         repo_count = db.session.query(Repository).count()
@@ -90,7 +90,14 @@ def collect_data_for_target(sfera_username, sfera_password, project_key, repo_na
                     
                     commit_dt = parser.isoparse(commit_date_str)
                     
+                    # Проверяем дату и email автора
                     if since_dt <= commit_dt <= until_dt:
+                        # Если указан target_email, проверяем его
+                        if target_email:
+                            author = commit_data.get('author', {})
+                            author_email = author.get('email', '').lower()
+                            if author_email != target_email.lower():
+                                continue
                         commits_in_range.append(commit_data)
                 
                 num_found_in_branch = len(commits_in_range)

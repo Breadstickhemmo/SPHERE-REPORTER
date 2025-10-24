@@ -1,0 +1,58 @@
+.analysis-filters {
+  margin-bottom: 2rem;
+}
+
+.analysis-filters h3 {
+  margin-top: 0;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.filters-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem 1.5rem;
+}
+
+.filters-grid .form-group {
+  margin: 0;
+}
+
+.filters-grid select, .filters-grid input {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  box-sizing: border-box;
+}
+
+.filters-grid .submit-group {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 1rem;
+}
+
+.filters-grid .primary-btn {
+  width: auto;
+  padding: 12px 30px;
+}
+
+.status-indicator {
+  background-color: #f8f9fa;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 0.9rem;
+  color: #333;
+}
+
+.credentials-grid {
+  grid-template-columns: 1fr 1fr auto;
+  align-items: flex-end;
+}
+
+.credentials-btn-group {
+  justify-content: flex-start;
+}

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { toast } from 'react-toastify';
+import '../styles/AnalysisFilters.css';
 
 interface AnalysisFiltersProps {
   fetchWithAuth: (url: string, options?: RequestInit) => Promise<Response>;
@@ -22,6 +23,7 @@ const AnalysisFilters: React.FC<AnalysisFiltersProps> = ({ fetchWithAuth, onAnal
   
   const [sferaUsername, setSferaUsername] = useState('');
   const [sferaPassword, setSferaPassword] = useState('');
+  const [targetEmail, setTargetEmail] = useState('');
   
   const today = new Date();
   const sevenDaysAgo = new Date();
@@ -124,6 +126,7 @@ const AnalysisFilters: React.FC<AnalysisFiltersProps> = ({ fetchWithAuth, onAnal
       branch_name: selectedBranch,
       since: new Date(since).toISOString(),
       until: new Date(new Date(until).setHours(23, 59, 59, 999)).toISOString(),
+      target_email: targetEmail.trim() || undefined,
     });
   };
 
@@ -174,6 +177,16 @@ const AnalysisFilters: React.FC<AnalysisFiltersProps> = ({ fetchWithAuth, onAnal
           </select>
         </div>
         
+        <div className="form-group">
+          <label>Email пользователя</label>
+          <input 
+            type="email" 
+            value={targetEmail} 
+            onChange={e => setTargetEmail(e.target.value)}
+            placeholder="Оставьте пустым для анализа всех пользователей"
+          />
+        </div>
+
         <div className="form-group">
           <label>Дата с</label>
           <input type="date" value={since} onChange={e => setSince(e.target.value)} required />

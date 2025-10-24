@@ -1,5 +1,6 @@
 import React from 'react';
 import logo from '../assets/logo-full.png';
+import '../styles/Header.css';
 
 interface User {
   id: number;

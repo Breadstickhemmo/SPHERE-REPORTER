@@ -1,4 +1,5 @@
 import React from 'react';
+import '../styles/MetricsDashboard.css';
 
 interface DashboardStats {
   summary: {
