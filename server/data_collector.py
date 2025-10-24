@@ -44,8 +44,6 @@ def collect_data_for_target(sfera_username, sfera_password, project_key, repo_na
             total_newly_saved_commits = 0
 
             for b_name in branches_to_scan:
-                db.session.begin()
-                
                 commits_from_api = api.get_repo_commits(project_key, repo_name, branch=b_name, since_dt=since_dt)
                 
                 if not commits_from_api:
@@ -116,7 +114,9 @@ def collect_data_for_target(sfera_username, sfera_password, project_key, repo_na
 
                     db.session.add(new_commit)
                     total_newly_saved_commits += 1
+                
                 db.session.commit()
+                db.session.remove()
 
             msg = (f"Анализ завершен. Найдено {total_commits_found_in_range} коммитов. "
                    f"Добавлено в базу: {total_newly_saved_commits}.")

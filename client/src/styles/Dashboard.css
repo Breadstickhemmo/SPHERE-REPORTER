@@ -2,7 +2,6 @@
   background: linear-gradient(90deg, #2F2BF0 0%, #09FFA9 100%);
   color: white;
   padding: 3rem 0;
-  /* Убрал скругление углов, чтобы секция прилегала к краям */
 }
 
 .analysis-header {
@@ -31,7 +30,7 @@
 
 .results-section {
   padding: 3rem 0;
-  background-color: #f8f9fa; /* Добавил фон для консистентности */
+  background-color: #f8f9fa;
 }
 
 .data-table {
@@ -89,8 +88,8 @@
   font-size: 0.9rem;
 }
 
-.data-table td:nth-child(3) {
-  max-width: 300px;
+.data-table td:nth-child(2) {
+  max-width: 350px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
