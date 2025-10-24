@@ -125,9 +125,7 @@ const App = () => {
 
           <main>
               {isAuthenticated ? (
-                  <div className="content-wrapper">
-                      <Dashboard fetchWithAuth={fetchWithAuth} />
-                  </div>
+                  <Dashboard fetchWithAuth={fetchWithAuth} />
               ) : (
                   <WelcomePage />
               )}

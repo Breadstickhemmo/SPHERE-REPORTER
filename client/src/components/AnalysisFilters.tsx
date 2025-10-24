@@ -131,8 +131,7 @@ const AnalysisFilters: React.FC<AnalysisFiltersProps> = ({ fetchWithAuth, onAnal
   };
 
   return (
-    <form onSubmit={handleSubmit} className="analysis-filters card">
-      <h3>Параметры анализа</h3>
+    <form onSubmit={handleSubmit} className="analysis-filters">
       <div className="filters-grid credentials-grid">
         <div className="form-group">
           <label>Email в Сфере</label>
@@ -201,7 +200,7 @@ const AnalysisFilters: React.FC<AnalysisFiltersProps> = ({ fetchWithAuth, onAnal
             type="email" 
             value={targetEmail} 
             onChange={e => setTargetEmail(e.target.value)}
-            placeholder="Оставьте пустым для анализа всех пользователей"
+            placeholder="Оставьте пустым для всех пользователей"
           />
         </div>
 
@@ -216,7 +215,7 @@ const AnalysisFilters: React.FC<AnalysisFiltersProps> = ({ fetchWithAuth, onAnal
 
         <div className="form-group submit-group">
           <button type="submit" className="primary-btn" disabled={isCollecting || !selectedBranch}>
-            {isCollecting ? 'Идет анализ...' : 'Начать анализ'}
+            {isCollecting ? 'Идет анализ...' : 'Сформировать отчет'}
           </button>
         </div>
       </div>

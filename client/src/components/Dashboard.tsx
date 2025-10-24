@@ -149,8 +149,8 @@ const Dashboard: React.FC<DashboardProps> = ({ fetchWithAuth }) => {
   };
 
   const Table = ({ title, headers, data, renderRow }: any) => (
-    <div className="data-table card">
-        <h3>{title} ({data.length})</h3>
+    <div className="data-table">
+        <h3>{title}</h3>
         <div className="table-wrapper">
             <table>
                 <thead>
@@ -158,7 +158,7 @@ const Dashboard: React.FC<DashboardProps> = ({ fetchWithAuth }) => {
                 </thead>
                 <tbody>
                     {isLoading && <tr><td colSpan={headers.length}>Загрузка...</td></tr>}
-                    {!isLoading && data.length === 0 && <tr><td colSpan={headers.length}>Нет данных</td></tr>}
+                    {!isLoading && data.length === 0 && <tr><td colSpan={headers.length}>Нет данных для анализа. Заполните форму выше.</td></tr>}
                     {!isLoading && data.map(renderRow)}
                 </tbody>
             </table>
@@ -167,42 +167,46 @@ const Dashboard: React.FC<DashboardProps> = ({ fetchWithAuth }) => {
   );
 
   return (
-    <div>
-      <div className="dashboard-header">
-        <h2>Интерактивный анализ репозиториев</h2>
-        <div className="status-indicator">
-            <strong>Статус:</strong> {collectionStatusMsg}
+    <div className="dashboard-container">
+      <div className="analysis-section">
+        <div className="content-wrapper">
+            <div className="analysis-header">
+                <h2>Введите данные для формирования отчета</h2>
+                <div className="status-indicator">
+                    <strong>Статус:</strong> {collectionStatusMsg}
+                </div>
+            </div>
+            <AnalysisFilters 
+                fetchWithAuth={fetchWithAuth} 
+                onAnalysisStart={handleStartAnalysis} 
+                isCollecting={isCollecting} 
+            />
         </div>
       </div>
 
-      {/* --- ФИЛЬТРЫ ДЛЯ СБОРА ДАННЫХ --- */}
-      <AnalysisFilters 
-        fetchWithAuth={fetchWithAuth} 
-        onAnalysisStart={handleStartAnalysis} 
-        isCollecting={isCollecting} 
-      />
-
-      {/* --- ТАБЛИЦА НАЙДЕННЫХ КОММИТОВ --- */}
-      <div className="dashboard-grid" style={{ marginTop: '2rem' }}>
-        <Table
-          title="Найденные коммиты по фильтрам"
-          headers={['SHA', 'Автор', 'Сообщение', 'Дата']}
-          data={commits}
-          renderRow={(c: any) => (
-            <tr key={c.sha}>
-              <td title={c.sha}>{c.sha.substring(0, 7)}</td>
-              <td>{c.author_name}</td>
-              <td title={c.message}>{c.message}</td>
-              <td>{new Date(c.commit_date).toLocaleString('ru-RU')}</td>
-            </tr>
-          )}
-        />
-      </div>
-
-      {/* --- АНАЛИТИКА ПО НАЙДЕННЫМ КОММИТАМ --- */}
-      <div className="metrics-section">
-        <h3>Аналитика по найденным коммитам</h3>
-        <MetricsDashboard stats={stats} isLoading={isStatsLoading} />
+      <div className="results-section">
+        <div className="content-wrapper">
+            <Table
+              title="Найденные коммиты по фильтрам"
+              headers={['SHA', 'Автор', 'Сообщение', 'Дата']}
+              data={commits}
+              renderRow={(c: any) => (
+                <tr key={c.sha}>
+                  <td title={c.sha}>{c.sha.substring(0, 7)}</td>
+                  <td>{c.author_name}</td>
+                  <td title={c.message}>{c.message}</td>
+                  <td>{new Date(c.commit_date).toLocaleString('ru-RU')}</td>
+                </tr>
+              )}
+            />
+            
+            {stats && stats.summary.total_commits > 0 && (
+                <div className="metrics-section card">
+                    <h3>Аналитика по найденным коммитам</h3>
+                    <MetricsDashboard stats={stats} isLoading={isStatsLoading} />
+                </div>
+            )}
+        </div>
       </div>
     </div>
   );

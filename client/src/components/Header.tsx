@@ -17,10 +17,13 @@ interface HeaderProps {
 }
 
 const LogoutIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="22px" height="22px">
-        <path d="M10 17.25V14H6v-4h4V6.75L15.25 12 10 17.25zM19 3H5c-1.1 0-2 .9-2 2v4h2V5h14v14H5v-4H3v4c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="22px" height="22px">
+        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+        <polyline points="16 17 21 12 16 7"></polyline>
+        <line x1="21" y1="12" x2="9" y2="12"></line>
     </svg>
 );
+
 
 const Header: React.FC<HeaderProps> = ({
   isAuthenticated,
@@ -31,10 +34,9 @@ const Header: React.FC<HeaderProps> = ({
 }) => {
   return (
     <header className="header">
-      <div className="content-wrapper"> {/* <-- ИЗМЕНЕНИЕ: добавили wrapper */}
+      <div className="content-wrapper">
         <div className="logo">
           <img src={logo} alt="T1 Coding Report Logo" />
-          {/* Текстовая надпись удалена, так как она теперь часть изображения */}
         </div>
         <div className="auth-buttons">
           {isAuthenticated ? (
