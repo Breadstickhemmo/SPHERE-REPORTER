@@ -1,0 +1,65 @@
+.commit-modal-content {
+  max-width: 750px;
+  width: 90%;
+  height: 85vh;
+  max-height: 800px;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+}
+
+.modal-header {
+  padding: 1.5rem 2rem;
+  border-bottom: 1px solid #e9ecef;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.modal-header h2 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.modal-close-btn {
+  background: none;
+  border: none;
+  font-size: 2rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  color: #667085;
+}
+
+.modal-body {
+  padding: 1.5rem 2rem;
+  overflow-y: auto;
+  flex-grow: 1;
+}
+
+.commit-meta {
+  margin-bottom: 2rem;
+}
+
+.commit-meta p {
+  margin: 0.5rem 0;
+  word-break: break-word;
+}
+
+.modal-body h3 {
+  margin-top: 2rem;
+  margin-bottom: 1rem;
+}
+
+.recommendations-box {
+  background: #f8f9fa;
+}
+
+.recommendations-box pre {
+  white-space: pre-wrap;
+  font-family: inherit;
+  font-size: 0.9rem;
+  margin: 0;
+  word-wrap: break-word;
+}
