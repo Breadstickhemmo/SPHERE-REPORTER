@@ -4,6 +4,7 @@ from sqlalchemy import func, distinct
 from collections import defaultdict, Counter
 from datetime import datetime, timedelta
 import re
+import numpy as np
 
 from models import db, Commit, Repository
 
@@ -58,7 +59,12 @@ def register_metrics_routes(app):
             "active_contributors": summary_data[1] or 0,
             "last_commit_date": summary_data[2].isoformat() if summary_data[2] else None,
         }
-
+        
+        # Получаем всех контрибьюторов для выпадающего списка
+        all_contributors_query = filtered_query.with_entities(
+            Commit.author_name, Commit.author_email
+        ).distinct().all()
+        
         top_contributors_query = filtered_query.with_entities(
             Commit.author_name,
             func.avg(Commit.final_commit_score).label('avg_kpi'),
@@ -74,67 +80,52 @@ def register_metrics_routes(app):
             for author, avg_kpi, count in top_contributors_query
         ]
         
-        first_commit_date = filtered_query.with_entities(func.min(Commit.commit_date)).scalar()
-        if first_commit_date:
-            commits_by_day_query = filtered_query.with_entities(
-                func.date(Commit.commit_date),
-                func.count(Commit.sha)
-            ).group_by(func.date(Commit.commit_date)).order_by(func.date(Commit.commit_date)).all()
-            
-            activity_data = {dt.strftime('%Y-%m-%d'): count for dt, count in commits_by_day_query}
-            filled_activity = defaultdict(int)
-            current_date = first_commit_date.date()
-            end_date = summary.get("last_commit_date")
-            end_date = datetime.fromisoformat(end_date).date() if end_date else datetime.utcnow().date()
-            
-            while current_date <= end_date:
-                date_str = current_date.strftime('%Y-%m-%d')
-                filled_activity[date_str] = activity_data.get(date_str, 0)
-                current_date += timedelta(days=1)
-            
-            sorted_activity = sorted(filled_activity.items())
-            commit_activity = {"labels": [item[0] for item in sorted_activity], "data": [item[1] for item in sorted_activity]}
-        else:
-            commit_activity = {"labels": [], "data": []}
-            
-        return jsonify({"summary": summary, "top_contributors": top_contributors, "commit_activity": commit_activity}), 200
+        return jsonify({
+            "summary": summary, 
+            "top_contributors": top_contributors,
+            "all_contributors": [{"name": name, "email": email} for name, email in all_contributors_query]
+        }), 200
 
-    @app.route('/api/metrics/hotspots', methods=['GET'])
+    @app.route('/api/metrics/user_summary', methods=['GET'])
     @jwt_required()
-    def get_hotspots():
-        base_query = db.session.query(Commit).filter(Commit.commit_content.isnot(None))
-        filtered_query = apply_filters_to_query(base_query)
-        commits = filtered_query.all()
+    def get_user_summary():
+        author_email = request.args.get('author_email')
+        if not author_email:
+            return jsonify({"error": "author_email is required"}), 400
+
+        base_query = db.session.query(Commit).filter(Commit.author_email.ilike(f"%{author_email}%"))
+        query_with_filters = apply_filters_to_query(base_query)
         
-        file_counts = Counter()
-        file_pattern = re.compile(r'^\+\+\+ b/(.*)$', re.MULTILINE)
+        user_commits = query_with_filters.all()
 
-        for commit in commits:
-            try:
-                changed_files = file_pattern.findall(commit.commit_content)
-                file_counts.update(changed_files)
-            except Exception:
-                continue
+        if not user_commits:
+            return jsonify({"summary": {"total_commits": 0}, "recommendation": "Нет данных для анализа."}), 200
+
+        # Сводка KPI
+        scores = [c.final_commit_score for c in user_commits if c.final_commit_score is not None]
+        avg_score = np.mean(scores) if scores else 0
+        max_possible_score = 17.5
+        avg_kpi_100 = int((avg_score / max_possible_score) * 100)
         
-        hotspots = [{"file": file, "changes": count} for file, count in file_counts.most_common(10)]
-        return jsonify(hotspots), 200
+        summary = {
+            "total_commits": len(user_commits),
+            "average_kpi": avg_kpi_100
+        }
 
-    @app.route('/api/metrics/temporal_patterns', methods=['GET'])
-    @jwt_required()
-    def get_temporal_patterns():
-        base_query = db.session.query(Commit)
-        filtered_query = apply_filters_to_query(base_query)
+        # Генерация рекомендации
+        avg_llm_scores = {
+            "качество": np.mean([c.llm_score_quality for c in user_commits if c.llm_score_quality is not None]) if any(c.llm_score_quality for c in user_commits) else 5,
+            "сложность": np.mean([c.llm_score_complexity for c in user_commits if c.llm_score_complexity is not None]) if any(c.llm_score_complexity for c in user_commits) else 5,
+            "комментарий": np.mean([c.llm_score_comment for c in user_commits if c.llm_score_comment is not None]) if any(c.llm_score_comment for c in user_commits) else 5,
+        }
+        
+        lowest_category = min(avg_llm_scores, key=avg_llm_scores.get)
+        
+        recommendations_map = {
+            "качество": "Основная зона роста - качество кода. Старайтесь следовать принципам SOLID, избегать дублирования и писать более чистые функции.",
+            "сложность": "Рекомендуется обратить внимание на сложность реализуемых задач. Возможно, стоит браться за более комплексные фичи для профессионального роста.",
+            "комментарий": "Ваша ключевая точка роста - написание комментариев к коммитам. Старайтесь делать их более информативными, описывая суть изменений и ссылаясь на номер задачи."
+        }
+        recommendation = f"Анализ коммитов за выбранный период показывает, что ваш средний KPI составляет {avg_kpi_100}/100. \n\n{recommendations_map.get(lowest_category, 'Продолжайте в том же духе!')}"
 
-        results = filtered_query.with_entities(
-            func.extract('isodow', Commit.commit_date).label('day_of_week'),
-            func.extract('hour', Commit.commit_date).label('hour_of_day'),
-            func.count(Commit.sha).label('commit_count')
-        ).group_by('day_of_week', 'hour_of_day').all()
-
-        day_map = {1: 'Пн', 2: 'Вт', 3: 'Ср', 4: 'Чт', 5: 'Пт', 6: 'Сб', 7: 'Вс'}
-
-        patterns = [
-            {"day": day_map.get(row.day_of_week), "hour": int(row.hour_of_day), "commits": row.commit_count}
-            for row in results if row.day_of_week in day_map
-        ]
-        return jsonify(patterns), 200
+        return jsonify({"summary": summary, "recommendation": recommendation}), 200

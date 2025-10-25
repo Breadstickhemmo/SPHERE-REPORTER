@@ -5,10 +5,16 @@ import MetricsDashboard from './MetricsDashboard';
 import CommitDetailModal from './CommitDetailModal';
 import HotspotsChart from './HotspotsChart';
 import TemporalHeatmap from './TemporalHeatmap';
+import UserAnalyticsDashboard from './UserAnalyticsDashboard';
 import '../styles/Dashboard.css';
 
 interface DashboardProps {
   fetchWithAuth: (url: string, options?: RequestInit) => Promise<Response>;
+}
+
+interface Contributor {
+    name: string;
+    email: string;
 }
 
 interface TopContributor {
@@ -25,6 +31,7 @@ interface DashboardStats {
     last_commit_date: string | null;
   };
   top_contributors: TopContributor[];
+  all_contributors: Contributor[];
   commit_activity: {
     labels: string[];
     data: number[];
@@ -36,7 +43,7 @@ const Dashboard: React.FC<DashboardProps> = ({ fetchWithAuth }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [isCollecting, setIsCollecting] = useState(false);
   const [collectionStatusMsg, setCollectionStatusMsg] = useState('Ожидание запуска');
-  const [stats, setStats] = useState<any | null>(null);
+  const [stats, setStats] = useState<DashboardStats | null>(null);
   const [isStatsLoading, setIsStatsLoading] = useState(false);
   const [lastFilters, setLastFilters] = useState<any>(null);
   const prevIsCollecting = useRef<boolean>(false);
@@ -44,6 +51,7 @@ const Dashboard: React.FC<DashboardProps> = ({ fetchWithAuth }) => {
   const [hotspots, setHotspots] = useState<any[]>([]);
   const [temporalPatterns, setTemporalPatterns] = useState<any[]>([]);
   const [isExtraMetricsLoading, setIsExtraMetricsLoading] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<Contributor | null>(null);
 
   const fetchDashboardStats = useCallback(async (filters: any = {}) => {
     setIsStatsLoading(true);
@@ -124,7 +132,7 @@ const Dashboard: React.FC<DashboardProps> = ({ fetchWithAuth }) => {
       const data = await res.json();
       setIsCollecting(data.is_running);
       setCollectionStatusMsg(data.message);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Не удалось проверить статус сборщика", error);
     }
   }, [fetchWithAuth]);
@@ -154,6 +162,7 @@ const Dashboard: React.FC<DashboardProps> = ({ fetchWithAuth }) => {
     setStats(null);
     setHotspots([]);
     setTemporalPatterns([]);
+    setSelectedUser(null);
 
     fetchFilteredCommits(params);
     fetchDashboardStats(params);
@@ -241,8 +250,35 @@ const Dashboard: React.FC<DashboardProps> = ({ fetchWithAuth }) => {
             <div className="metrics-section card">
                 <h3>Аналитика по найденным коммитам</h3>
                 <MetricsDashboard stats={stats} isLoading={isStatsLoading} />
-            </div>
 
+                {stats?.all_contributors && stats.all_contributors.length > 0 && (
+                    <div className="user-selector-wrapper">
+                        <label htmlFor="user-selector">Персональная аналитика:</label>
+                        <select
+                            id="user-selector"
+                            value={selectedUser ? selectedUser.email : ''}
+                            onChange={(e) => {
+                                const user = stats.all_contributors.find((u: Contributor) => u.email === e.target.value);
+                                setSelectedUser(user || null);
+                            }}
+                        >
+                            <option value="">-- Выберите пользователя --</option>
+                            {stats.all_contributors.map((user: Contributor) => (
+                                <option key={user.email} value={user.email}>{user.name}</option>
+                            ))}
+                        </select>
+                    </div>
+                )}
+            </div>
+            
+            {selectedUser && (
+                <UserAnalyticsDashboard 
+                    user={selectedUser}
+                    filters={lastFilters || {}}
+                    fetchWithAuth={fetchWithAuth}
+                />
+            )}
+            
             {isExtraMetricsLoading ? 
                 <div className="loading-screen">Загрузка дополнительной аналитики...</div> :
                 <>

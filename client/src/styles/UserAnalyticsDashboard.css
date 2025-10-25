@@ -1,0 +1,58 @@
+/* src/styles/UserAnalyticsDashboard.css */
+.user-analytics-card {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+  padding: 1.5rem 2rem;
+  margin-top: 2rem;
+}
+
+.user-analytics-card.loading {
+    text-align: center;
+    color: #667085;
+}
+
+.user-analytics-card h3, .user-analytics-card h4 {
+  text-align: center;
+  margin-top: 0;
+}
+
+.user-analytics-card h4 {
+    margin-top: 1.5rem;
+    color: #667085;
+    font-weight: 500;
+}
+
+.user-stats-grid {
+    display: flex;
+    justify-content: center;
+    gap: 2rem;
+    margin: 1.5rem 0;
+}
+
+.user-stat {
+    text-align: center;
+}
+
+.user-stat h4 {
+    margin: 0 0 0.5rem 0;
+    font-size: 1rem;
+    font-weight: 500;
+    color: #666;
+    text-transform: uppercase;
+}
+
+.user-stat p {
+    margin: 0;
+    font-size: 2rem;
+    font-weight: 700;
+    color: #2F2BF0;
+}
+
+.recommendation-text {
+    background-color: #f8f9fa;
+    padding: 1rem;
+    border-radius: 8px;
+    white-space: pre-wrap;
+    line-height: 1.6;
+}
