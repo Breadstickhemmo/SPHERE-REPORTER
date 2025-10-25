@@ -38,13 +38,13 @@
 │   └── src/               # Исходный код фронтенда
 │       ├── App.tsx        # Главный компонент
 │       ├── types.ts       # TypeScript типы
-│       ├── index.css       # Оформление
-│       ├── index.tsx       # Обращение по id
+│       ├── index.css      # Оформление
+│       ├── index.tsx      # Обращение по id
 │       ├── logo.svg       # logo
-│       ├── assets/       # Ассеты
-│       ├── styles/       # Стили
-│       ├── types/      # Расширения
-│       ├── utils/       # logo
+│       ├── assets/        # Ассеты
+│       ├── styles/        # Стили
+│       ├── types/         # Расширения
+│       ├── utils/         # Вспомогательная функция
 │       └── components/    # React-компоненты
 ├── server/                # Бэкенд-приложение (Flask)
 │   ├── app.py            # Точка входа приложения
