@@ -3,6 +3,8 @@ import { toast } from 'react-toastify';
 import AnalysisFilters from './AnalysisFilters';
 import MetricsDashboard from './MetricsDashboard';
 import CommitDetailModal from './CommitDetailModal';
+import HotspotsChart from './HotspotsChart';
+import TemporalHeatmap from './TemporalHeatmap';
 import '../styles/Dashboard.css';
 
 interface DashboardProps {
@@ -34,18 +36,26 @@ const Dashboard: React.FC<DashboardProps> = ({ fetchWithAuth }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [isCollecting, setIsCollecting] = useState(false);
   const [collectionStatusMsg, setCollectionStatusMsg] = useState('Ожидание запуска');
-
-  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [stats, setStats] = useState<any | null>(null);
   const [isStatsLoading, setIsStatsLoading] = useState(false);
-
   const [lastFilters, setLastFilters] = useState<any>(null);
   const prevIsCollecting = useRef<boolean>(false);
   const [selectedCommit, setSelectedCommit] = useState<any | null>(null);
+  const [hotspots, setHotspots] = useState<any[]>([]);
+  const [temporalPatterns, setTemporalPatterns] = useState<any[]>([]);
+  const [isExtraMetricsLoading, setIsExtraMetricsLoading] = useState(false);
 
-  const fetchDashboardStats = useCallback(async () => {
+  const fetchDashboardStats = useCallback(async (filters: any = {}) => {
     setIsStatsLoading(true);
     try {
-      const res = await fetchWithAuth('/api/metrics/dashboard_stats');
+      const params = new URLSearchParams();
+      if (filters.project_key) params.append('project_key', filters.project_key);
+      if (filters.repo_name) params.append('repo_name', filters.repo_name);
+      if (filters.target_email) params.append('author_email', filters.target_email);
+      if (filters.since) params.append('since', filters.since);
+      if (filters.until) params.append('until', filters.until);
+      
+      const res = await fetchWithAuth(`/api/metrics/dashboard_stats?${params.toString()}`);
       if (!res.ok) throw new Error('Ошибка загрузки статистики');
       const data = await res.json();
       setStats(data);
@@ -78,6 +88,36 @@ const Dashboard: React.FC<DashboardProps> = ({ fetchWithAuth }) => {
     }
   }, [fetchWithAuth]);
 
+  const fetchExtraMetrics = useCallback(async (filters: any) => {
+    setIsExtraMetricsLoading(true);
+    try {
+        const params = new URLSearchParams();
+        if (filters.project_key) params.append('project_key', filters.project_key);
+        if (filters.repo_name) params.append('repo_name', filters.repo_name);
+        if (filters.target_email) params.append('author_email', filters.target_email);
+        if (filters.since) params.append('since', filters.since);
+        if (filters.until) params.append('until', filters.until);
+
+        const [hotspotsRes, temporalRes] = await Promise.all([
+            fetchWithAuth(`/api/metrics/hotspots?${params.toString()}`),
+            fetchWithAuth(`/api/metrics/temporal_patterns?${params.toString()}`)
+        ]);
+
+        if (!hotspotsRes.ok) throw new Error('Ошибка загрузки горячих точек');
+        const hotspotsData = await hotspotsRes.json();
+        setHotspots(hotspotsData);
+
+        if (!temporalRes.ok) throw new Error('Ошибка загрузки временных паттернов');
+        const temporalData = await temporalRes.json();
+        setTemporalPatterns(temporalData);
+
+    } catch (error: any) {
+        toast.error(error.message);
+    } finally {
+        setIsExtraMetricsLoading(false);
+    }
+  }, [fetchWithAuth]);
+
   const checkCollectionStatus = useCallback(async () => {
     try {
       const res = await fetchWithAuth('/api/admin/collection-status');
@@ -93,10 +133,11 @@ const Dashboard: React.FC<DashboardProps> = ({ fetchWithAuth }) => {
     if (prevIsCollecting.current && !isCollecting && lastFilters) {
       toast.info("Сбор данных завершен, обновляем данные...");
       fetchFilteredCommits(lastFilters);
-      fetchDashboardStats();
+      fetchDashboardStats(lastFilters);
+      fetchExtraMetrics(lastFilters);
     }
     prevIsCollecting.current = isCollecting;
-  }, [isCollecting, fetchFilteredCommits, fetchDashboardStats, lastFilters]);
+  }, [isCollecting, fetchFilteredCommits, fetchDashboardStats, fetchExtraMetrics, lastFilters]);
 
   useEffect(() => {
     const interval = setInterval(checkCollectionStatus, 5000);
@@ -111,13 +152,22 @@ const Dashboard: React.FC<DashboardProps> = ({ fetchWithAuth }) => {
     setLastFilters(params);
     setCommits([]);
     setStats(null);
+    setHotspots([]);
+    setTemporalPatterns([]);
+
+    fetchFilteredCommits(params);
+    fetchDashboardStats(params);
+    fetchExtraMetrics(params);
+    
     try {
       const response = await fetchWithAuth('/api/admin/start-collection', {
         method: 'POST',
         body: JSON.stringify(params),
       });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.message || 'Не удалось запустить анализ');
+      if (!response.ok) {
+        throw new Error(data.message || 'Не удалось запустить анализ');
+      }
       toast.success("Анализ запущен в фоновом режиме.");
     } catch (error: any) {
       toast.error(error.message);
@@ -192,6 +242,18 @@ const Dashboard: React.FC<DashboardProps> = ({ fetchWithAuth }) => {
                 <h3>Аналитика по найденным коммитам</h3>
                 <MetricsDashboard stats={stats} isLoading={isStatsLoading} />
             </div>
+
+            {isExtraMetricsLoading ? 
+                <div className="loading-screen">Загрузка дополнительной аналитики...</div> :
+                <>
+                    <div className="additional-metric-wrapper">
+                        <HotspotsChart data={hotspots} />
+                    </div>
+                    <div className="additional-metric-wrapper">
+                        <TemporalHeatmap data={temporalPatterns} />
+                    </div>
+                </>
+            }
         </div>
       </div>
       {selectedCommit && (
