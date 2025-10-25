@@ -38,6 +38,13 @@
 │   └── src/               # Исходный код фронтенда
 │       ├── App.tsx        # Главный компонент
 │       ├── types.ts       # TypeScript типы
+│       ├── index.css       # Оформление
+│       ├── index.tsx       # Обращение по id
+│       ├── logo.svg       # logo
+│       ├── assets/       # Ассеты
+│       ├── styles/       # Стили
+│       ├── types/      # Расширения
+│       ├── utils/       # logo
 │       └── components/    # React-компоненты
 ├── server/                # Бэкенд-приложение (Flask)
 │   ├── app.py            # Точка входа приложения
@@ -46,6 +53,12 @@
 │   ├── routes.py         # API маршруты
 │   ├── auth_routes.py    # Аутентификация
 │   ├── utils.py          # Вспомогательные функции
+│   ├── data_collector.py   # Получение данных по коммитам
+│   ├── kpi_calculator.py   # Расчёт KPI
+│   ├── llm_analyzer.py     # Расчёт LLM-оценки коммита
+│   ├── metrics_routes.py   # Вспомогательные функции
+│   ├── sfera_api.py        # Интеграция API Sfera
+│   ├── sfera_routes.py     # API Sfera маршруты
 │   └── migrations/       # Миграции базы данных
 ```
 
@@ -92,7 +105,7 @@ SFERA_PASSWORD=ВАШ_ПАРОЛЬ_СФЕРЫ
 
 # (замените на ваши данные)
 DATABASE_URL=postgresql://hackathon_user:hackathon_pass@localhost:5432/hackathon_db
-
+GIGACHAT_CREDENTIALS=ваш токен
 JWT_SECRET_KEY=сгенерируйте_свой_ключ_здесь
 FLASK_SECRET_KEY=сгенерируйте_другой_ключ_здесь
 DEBUG=True
