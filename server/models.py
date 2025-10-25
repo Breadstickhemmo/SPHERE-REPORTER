@@ -19,36 +19,19 @@ class User(db.Model):
     def check_password(self, password):
         return bcrypt.check_password_hash(self.password_hash, password)
 
-    def __repr__(self):
-        return f'<User {self.username}>'
-
 class Project(db.Model):
     __tablename__ = 'projects'
     key = db.Column(db.String(100), primary_key=True)
     name = db.Column(db.String(255), nullable=False)
     description = db.Column(db.Text, nullable=True)
-
-    repositories = db.relationship(
-        'Repository', 
-        foreign_keys='Repository.project_key',
-        backref='project', 
-        lazy=True, 
-        cascade="all, delete-orphan"
-    )
-
-    def __repr__(self):
-        return f'<Project {self.key}>'
+    repositories = db.relationship('Repository', backref='project', lazy=True)
 
 class Repository(db.Model):
     __tablename__ = 'repositories'
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(255), nullable=False)
     project_key = db.Column(db.String(255), db.ForeignKey('projects.key'), nullable=False)
-    
-    commits = db.relationship('Commit', backref='repository', lazy=True, cascade="all, delete-orphan")
-    
-    def to_dict(self):
-        return {'id': self.id, 'name': self.name, 'project_key': self.project_key}
+    commits = db.relationship('Commit', backref='repository', lazy=True)
 
 class Commit(db.Model):
     __tablename__ = 'commits'
@@ -57,11 +40,15 @@ class Commit(db.Model):
     author_name = db.Column(db.String(255), nullable=False)
     author_email = db.Column(db.String(255), nullable=True)
     commit_date = db.Column(db.DateTime(timezone=True), nullable=False)
-    commit_content=db.Column(db.String, nullable=True)
+    commit_content = db.Column(db.Text, nullable=True)
     added_lines = db.Column(db.Integer, default=0)
     deleted_lines = db.Column(db.Integer, default=0)
     repository_id = db.Column(db.Integer, db.ForeignKey('repositories.id'), nullable=False)
     project_key = db.Column(db.String, db.ForeignKey('projects.key'), nullable=True)
+
+    kpi_difficulty = db.Column(db.Float, nullable=True)
+    kpi_quality = db.Column(db.Float, nullable=True)
+    kpi_size = db.Column(db.Integer, nullable=True)
 
     llm_score_size = db.Column(db.Integer, nullable=True)
     llm_score_quality = db.Column(db.Integer, nullable=True)
@@ -69,20 +56,22 @@ class Commit(db.Model):
     llm_score_comment = db.Column(db.Integer, nullable=True)
     llm_total_score = db.Column(db.Integer, nullable=True)
     llm_evaluation_text = db.Column(db.Text, nullable=True)
+    
+    final_commit_score = db.Column(db.Float, nullable=True)
 
     def to_dict(self):
-        commit_dict = {
+        max_possible_score = 17.5 
+        score_100 = None
+        if self.final_commit_score is not None:
+            score_100 = int((self.final_commit_score / max_possible_score) * 100)
+
+        return {
             'sha': self.sha,
-            'message': self.message,
+            'message': self.message.splitlines()[0],
             'author_name': self.author_name,
-            'author_email': self.author_email,
             'commit_date': self.commit_date.isoformat(),
-            'added_lines': self.added_lines,
-            'deleted_lines': self.deleted_lines,
-            'repository_id': self.repository_id,
-            'total_score_100': int((self.llm_total_score / 20) * 100) if self.llm_total_score is not None else None
+            'total_score_100': score_100
         }
-        return commit_dict
 
     def to_detailed_dict(self):
         base_dict = self.to_dict()

@@ -9,6 +9,12 @@ interface DashboardProps {
   fetchWithAuth: (url: string, options?: RequestInit) => Promise<Response>;
 }
 
+interface TopContributor {
+  author: string;
+  average_kpi: number;
+  commits: number;
+}
+
 interface DashboardStats {
   summary: {
     total_commits: number;
@@ -16,10 +22,7 @@ interface DashboardStats {
     active_contributors: number;
     last_commit_date: string | null;
   };
-  top_contributors: {
-    author: string;
-    commits: number;
-  }[];
+  top_contributors: TopContributor[];
   commit_activity: {
     labels: string[];
     data: number[];
@@ -31,44 +34,31 @@ const Dashboard: React.FC<DashboardProps> = ({ fetchWithAuth }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [isCollecting, setIsCollecting] = useState(false);
   const [collectionStatusMsg, setCollectionStatusMsg] = useState('Ожидание запуска');
+
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [isStatsLoading, setIsStatsLoading] = useState(false);
+
   const [lastFilters, setLastFilters] = useState<any>(null);
   const prevIsCollecting = useRef<boolean>(false);
   const [selectedCommit, setSelectedCommit] = useState<any | null>(null);
 
-  const calculateStats = (commits: any[]): DashboardStats => {
-    const total_commits = commits.length;
-    const total_lines_changed = commits.reduce((acc, c) => acc + (c.added_lines || 0) + (c.deleted_lines || 0), 0);
-    const contributors = Array.from(new Set(commits.map(c => c.author_name)));
-    const active_contributors = contributors.length;
-    const last_commit_date = commits.length > 0 ? commits[0].commit_date : null;
-    const contribMap: Record<string, number> = {};
-    commits.forEach(c => {
-      if (!contribMap[c.author_name]) contribMap[c.author_name] = 0;
-      contribMap[c.author_name]++;
-    });
-    const top_contributors = Object.entries(contribMap)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
-      .map(([author, commits]) => ({ author, commits }));
-    const activityMap: Record<string, number> = {};
-    commits.forEach(c => {
-      const date = c.commit_date.slice(0, 10);
-      activityMap[date] = (activityMap[date] || 0) + 1;
-    });
-    const labels = Object.keys(activityMap).sort();
-    const data = labels.map(l => activityMap[l]);
-    return {
-      summary: { total_commits, total_lines_changed, active_contributors, last_commit_date },
-      top_contributors,
-      commit_activity: { labels, data },
-    };
-  };
+  const fetchDashboardStats = useCallback(async () => {
+    setIsStatsLoading(true);
+    try {
+      const res = await fetchWithAuth('/api/metrics/dashboard_stats');
+      if (!res.ok) throw new Error('Ошибка загрузки статистики');
+      const data = await res.json();
+      setStats(data);
+    } catch (error: any) {
+      toast.error(error.message || 'Не удалось загрузить статистику');
+      setStats(null);
+    } finally {
+      setIsStatsLoading(false);
+    }
+  }, [fetchWithAuth]);
 
   const fetchFilteredCommits = useCallback(async (filters: any) => {
     setIsLoading(true);
-    setIsStatsLoading(true);
     try {
       const params = new URLSearchParams();
       if (filters.project_key) params.append('project_key', filters.project_key);
@@ -80,14 +70,11 @@ const Dashboard: React.FC<DashboardProps> = ({ fetchWithAuth }) => {
       if (!res.ok) throw new Error('Ошибка загрузки коммитов по фильтрам');
       const data = await res.json();
       setCommits(data);
-      setStats(calculateStats(data));
     } catch (error: any) {
       toast.error(error.message || 'Не удалось загрузить коммиты по фильтрам');
       setCommits([]);
-      setStats(null);
     } finally {
       setIsLoading(false);
-      setIsStatsLoading(false);
     }
   }, [fetchWithAuth]);
 
@@ -104,16 +91,18 @@ const Dashboard: React.FC<DashboardProps> = ({ fetchWithAuth }) => {
 
   useEffect(() => {
     if (prevIsCollecting.current && !isCollecting && lastFilters) {
-      toast.info("Сбор данных завершен, обновляем найденные коммиты...");
+      toast.info("Сбор данных завершен, обновляем данные...");
       fetchFilteredCommits(lastFilters);
+      fetchDashboardStats();
     }
     prevIsCollecting.current = isCollecting;
-  }, [isCollecting, fetchFilteredCommits, lastFilters]);
+  }, [isCollecting, fetchFilteredCommits, fetchDashboardStats, lastFilters]);
 
   useEffect(() => {
     const interval = setInterval(checkCollectionStatus, 5000);
+    fetchDashboardStats();
     return () => clearInterval(interval);
-  }, [checkCollectionStatus]);
+  }, [checkCollectionStatus, fetchDashboardStats]);
 
   const handleStartAnalysis = async (params: any) => {
     setIsCollecting(true);
@@ -199,12 +188,10 @@ const Dashboard: React.FC<DashboardProps> = ({ fetchWithAuth }) => {
               )}
             />
             
-            {stats && stats.summary.total_commits > 0 && (
-                <div className="metrics-section card">
-                    <h3>Аналитика по найденным коммитам</h3>
-                    <MetricsDashboard stats={stats} isLoading={isStatsLoading} />
-                </div>
-            )}
+            <div className="metrics-section card">
+                <h3>Аналитика по найденным коммитам</h3>
+                <MetricsDashboard stats={stats} isLoading={isStatsLoading} />
+            </div>
         </div>
       </div>
       {selectedCommit && (

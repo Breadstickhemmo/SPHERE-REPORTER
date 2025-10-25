@@ -8,14 +8,17 @@ interface DashboardStats {
     active_contributors: number;
     last_commit_date: string | null;
   };
-  top_contributors: {
-    author: string;
-    commits: number;
-  }[];
+  top_contributors: TopContributor[];
   commit_activity: {
     labels: string[];
     data: number[];
   };
+}
+
+interface TopContributor {
+    author: string;
+    average_kpi: number;
+    commits: number;
 }
 
 interface MetricsDashboardProps {
@@ -30,8 +33,8 @@ const StatCard: React.FC<{ title: string; value: string | number, className?: st
   </div>
 );
 
-const SimpleBarChart: React.FC<{ data: { label: string; value: number }[], title: string }> = ({ data, title }) => {
-    const maxValue = Math.max(...data.map(d => d.value), 0);
+const SimpleBarChart: React.FC<{ data: { label: string; value: number; raw_value: string }[], title: string }> = ({ data, title }) => {
+    const maxValue = 100;
     return (
         <div className="bar-chart card">
             <h3>{title}</h3>
@@ -42,12 +45,12 @@ const SimpleBarChart: React.FC<{ data: { label: string; value: number }[], title
                         <div className="bar-wrapper">
                             <div 
                                 className="bar" 
-                                style={{ width: `${maxValue > 0 ? (item.value / maxValue) * 100 : 0}%` }}
-                                title={`Коммитов: ${item.value}`}
+                                style={{ width: `${(item.value / maxValue) * 100}%` }}
+                                title={`Средний KPI: ${item.raw_value}`}
                             >
                             </div>
                         </div>
-                         <div className="bar-value">{item.value}</div>
+                         <div className="bar-value">{item.raw_value}</div>
                     </div>
                 )) : <p>Нет данных для отображения</p>}
             </div>
@@ -86,8 +89,12 @@ const MetricsDashboard: React.FC<MetricsDashboardProps> = ({ stats, isLoading })
       
       <div className="dashboard-grid" style={{ marginTop: '2rem' }}>
         <SimpleBarChart 
-            title="Топ 5 контрибьюторов"
-            data={top_contributors.map(c => ({ label: c.author, value: c.commits }))}
+            title="Топ 5 контрибьюторов по среднему KPI"
+            data={top_contributors.map(c => ({ 
+                label: c.author, 
+                value: c.average_kpi,
+                raw_value: `${c.average_kpi} / 100`
+            }))}
         />
       </div>
     </div>

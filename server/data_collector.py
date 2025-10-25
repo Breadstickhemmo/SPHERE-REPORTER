@@ -5,6 +5,7 @@ from sfera_api import SferaAPI
 from models import db, Project, Repository, Commit
 from dateutil import parser
 from llm_analyzer import analyze_commit_code
+from kpi_calculator import calculate_deterministic_kpi, calculate_final_score
 
 logger = logging.getLogger(__name__)
 
@@ -94,13 +95,18 @@ def collect_data_for_target(sfera_username, sfera_password, project_key, repo_na
                         project_key=project_key,
                     )
 
+                    deterministic_kpi = calculate_deterministic_kpi(new_commit.added_lines, new_commit.deleted_lines)
+                    new_commit.kpi_difficulty = deterministic_kpi.get('difficulty')
+                    new_commit.kpi_quality = deterministic_kpi.get('quality')
+                    new_commit.kpi_size = deterministic_kpi.get('size')
+
                     try:
                         diff_content = base64.b64decode(diff_content_base64).decode('utf-8', errors='ignore')
                         new_commit.commit_content = diff_content
                         
-                        analysis_result = analyze_commit_code(diff_content)
+                        analysis_result = analyze_commit_code(diff_content, new_commit.message)
                         
-                        if analysis_result and "scores" in analysis_result:
+                        if analysis_result and "scores" in analysis_result and analysis_result["scores"]:
                             scores = analysis_result["scores"]
                             new_commit.llm_score_size = scores.get('size')
                             new_commit.llm_score_quality = scores.get('quality')
@@ -108,7 +114,9 @@ def collect_data_for_target(sfera_username, sfera_password, project_key, repo_na
                             new_commit.llm_score_comment = scores.get('comment')
                             new_commit.llm_total_score = scores.get('sum')
                             new_commit.llm_evaluation_text = analysis_result.get("raw_text")
-                            logger.info(f"Коммит {sha[:7]} успешно проанализирован GigaChat.")
+                            
+                            new_commit.final_commit_score = calculate_final_score(deterministic_kpi, scores)
+                            logger.info(f"Коммит {sha[:7]} успешно проанализирован.")
                     except Exception as e:
                         logger.error(f"Ошибка во время LLM-анализа коммита {sha[:7]}: {e}")
 

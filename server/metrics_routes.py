@@ -7,24 +7,17 @@ from datetime import datetime, timedelta
 from models import db, Commit
 
 def register_metrics_routes(app):
-
-    app.logger.info("Регистрируем маршруты метрик")
-
     @app.route('/api/metrics/dashboard_stats', methods=['GET'])
     @jwt_required()
     def get_dashboard_stats():
-        app.logger.info("Вход в /api/metrics/dashboard_stats")
         total_commits = db.session.query(func.count(Commit.sha)).scalar()
         
         if total_commits == 0:
             return jsonify({
                 "summary": {
                     "total_commits": 0,
-                    "total_lines_added": 0,
-                    "total_lines_deleted": 0,
                     "total_lines_changed": 0,
                     "active_contributors": 0,
-                    "first_commit_date": None,
                     "last_commit_date": None,
                 },
                 "top_contributors": [],
@@ -35,34 +28,34 @@ def register_metrics_routes(app):
         total_lines_deleted = db.session.query(func.sum(Commit.deleted_lines)).scalar()
         active_contributors = db.session.query(func.count(distinct(Commit.author_name))).scalar()
         
-        first_commit_date = db.session.query(func.min(Commit.commit_date)).scalar()
         last_commit_date = db.session.query(func.max(Commit.commit_date)).scalar()
 
         summary = {
             "total_commits": total_commits or 0,
-            "total_lines_added": int(total_lines_added) if total_lines_added else 0,
-            "total_lines_deleted": int(total_lines_deleted) if total_lines_deleted else 0,
             "total_lines_changed": int(total_lines_added + total_lines_deleted) if total_lines_added else 0,
             "active_contributors": active_contributors or 0,
-            "first_commit_date": first_commit_date.isoformat() if first_commit_date else None,
             "last_commit_date": last_commit_date.isoformat() if last_commit_date else None,
         }
 
         top_contributors_query = db.session.query(
             Commit.author_name,
-            func.count(Commit.sha).label('commit_count'),
-            func.sum(Commit.added_lines).label('added'),
-            func.sum(Commit.deleted_lines).label('deleted')
-        ).group_by(Commit.author_name).order_by(func.count(Commit.sha).desc()).limit(5).all()
-
+            func.avg(Commit.final_commit_score).label('avg_kpi'),
+            func.count(Commit.sha).label('commit_count')
+        ).filter(Commit.final_commit_score.isnot(None))\
+         .group_by(Commit.author_name)\
+         .order_by(func.avg(Commit.final_commit_score).desc())\
+         .limit(5).all()
+        
+        max_possible_score = 17.5
         top_contributors = [
             {
                 "author": author,
-                "commits": count,
-                "lines_changed": int(added + deleted)
-            } for author, count, added, deleted in top_contributors_query
+                "average_kpi": int((avg_kpi / max_possible_score) * 100) if avg_kpi else 0,
+                "commits": count
+            } for author, avg_kpi, count in top_contributors_query
         ]
         
+        first_commit_date = db.session.query(func.min(Commit.commit_date)).scalar()
         if first_commit_date:
             commits_by_day = db.session.query(
                 func.date(Commit.commit_date),
